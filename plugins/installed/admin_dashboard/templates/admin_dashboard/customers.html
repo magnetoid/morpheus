@@ -1,0 +1,38 @@
+{% extends "admin_dashboard/base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-3xl font-bold tracking-tight">Customers</h1>
+    </div>
+
+    <div class="card rounded-md border bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow">
+        <div class="relative w-full overflow-auto">
+            <table class="w-full caption-bottom text-sm">
+                <thead class="[&_tr]:border-b border-[hsl(var(--border))]">
+                    <tr class="border-b transition-colors hover:bg-[hsl(var(--muted))]/50 data-[state=selected]:bg-[hsl(var(--muted))]">
+                        <th class="h-12 px-4 text-left align-middle font-medium text-[hsl(var(--muted-foreground))]">Name</th>
+                        <th class="h-12 px-4 text-left align-middle font-medium text-[hsl(var(--muted-foreground))]">Email</th>
+                        <th class="h-12 px-4 text-right align-middle font-medium text-[hsl(var(--muted-foreground))]">Total Spent</th>
+                    </tr>
+                </thead>
+                <tbody class="[&_tr:last-child]:border-0">
+                    {% for customer in data.customers %}
+                    <tr class="border-b border-[hsl(var(--border))] transition-colors hover:bg-[hsl(var(--muted))]/50">
+                        <td class="p-4 align-middle font-medium">{{ customer.fullName|default:"-" }}</td>
+                        <td class="p-4 align-middle">{{ customer.email }}</td>
+                        <td class="p-4 align-middle text-right">{{ customer.totalSpent.amount|default:"0.00" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="p-8 text-center text-[hsl(var(--muted-foreground))]">
+                            No customers found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,87 @@
+# Morpheus Engine — Platform Rules
+
+> **The law of the platform. Non-negotiable. Immutable.**
+> Read this before writing a single line of code.
+
+## The Mission
+**Morpheus is the first commerce engine built natively for AI Agents.**
+We do not treat AI as an API consumer or an afterthought. We treat AI agents as the **primary audience**. Every feature, endpoint, and capability must be fully understandable and executable by an LLM before a human UI is ever built.
+
+Morpheus wins by being infinitely scalable, horizontally extensible via a rigorous plugin architecture, and completely free from legacy vendor lock-in. 
+
+---
+
+## The 11 Immutable Laws
+
+### LAW 0 — Agentic First Touch ✦
+**Every feature is designed for an AI agent to use it before a human ever sees it.**
+- Can an agent call this via a single GraphQL operation?
+- Is the response fully structured and machine-parseable?
+- Does the GraphQL schema have `descriptions` on every type and argument? (This acts as the agent's prompt/documentation).
+- We maintain `core/schema_introspector.py` to auto-generate OpenAPI and MCP manifests directly from the live GraphQL schema.
+
+### LAW 1 — Everything Is a Plugin
+**The core contains nothing but the engine. All commerce logic is a plugin.**
+- The `core/` package only provides infrastructure: Hook registry, Plugin registry, Theme loader, Caching (`utils/cache.py`), and RBAC/Multi-tenancy models.
+- Features (Products, Orders, Customers, AI) are completely decoupled into `plugins/installed/`.
+- If a feature can be removed and the engine still boots, it must be a plugin.
+
+### LAW 2 — GraphQL First, Always
+**The API is the product. The UI is optional.**
+- All mutations and queries must reside in the GraphQL schema.
+- The storefront acts as a headless client consuming the GraphQL API via `api.client.internal_graphql()`.
+- We support a REST API (`api/rest.py`), but it serves strictly as a versioned, read-only data layer for external aggregators.
+
+### LAW 3 — The Storefront Never Touches the ORM
+**Storefront views get all data from `internal_graphql()`. Zero exceptions.**
+- The storefront is a living integration test of the API. Bypassing the API hides bugs.
+- **Never** import models from `plugins/installed/*/models.py` inside a theme or storefront view.
+
+### LAW 4 — Plugins Communicate Via Hooks
+**Plugins do not import from each other's internals. They use the hook registry.**
+- Use `from core.hooks import hook_registry, MorpheusEvents`.
+- Use `hook_registry.fire()` to trigger side-effects (e.g. `ORDER_PAID` triggers inventory reduction).
+- Remote Plugins (external Node/Go services) automatically receive these events via `WebhookEndpoint` Celery dispatch.
+
+### LAW 5 — Business Logic Lives in Services
+**Views receive HTTP. Resolvers receive GraphQL. Services do the work.**
+- Place all business logic in `services.py` inside the respective plugin.
+- Keep resolvers thin. Pass inputs to the service, and return the service's output.
+
+### LAW 6 — Safe Money and Immutable States
+**Currency is not a float. Order states are not arbitrary strings.**
+- All money uses `MoneyField` from `djmoney`. Never use floats or raw decimals.
+- Order statuses and transitions must use `django-fsm`. Direct mutation of state (e.g. `order.status = 'paid'`) is strictly forbidden. You must call state transitions (e.g. `order.confirm()`).
+- All financial transitions generate an immutable `OrderEvent` for strict auditability.
+
+### LAW 7 — All Primary Keys Are UUIDs
+**No auto-increment integers as primary keys. Ever.**
+- Prevent sequence prediction, ensure shard compatibility, and hide sales velocity.
+
+### LAW 8 — All Stock Changes Are Atomic
+**Never directly set `StockLevel.quantity`. Every change is audited.**
+- Use atomic stock movement records with `select_for_update()` to prevent race conditions during high-concurrency checkouts.
+
+### LAW 9 — All Caching is Event-Driven
+**Aggressive caching requires smart invalidation.**
+- We use Redis as our caching layer. 
+- All GraphQL and REST read endpoints should be cached.
+- Cache invalidation is bound to `MorpheusEvents` via `SmartCacheInvalidator`. (e.g. `PRODUCT_UPDATED` clears the product cache).
+
+### LAW 10 — Multi-Tenancy and RBAC by Default
+**Morpheus is built to serve Holding Companies and Headless architectures.**
+- All top-level entities (Products, Orders) must map to a `StoreChannel` for multi-tenancy.
+- API requests using Bearer tokens must be verified via `MorpheusAPIKeyAuthentication` to ensure agents and third-party tools do not exceed their authorized capabilities (`scopes`).
+
+---
+
+## Quick Reference Checklist for PRs
+
+Before merging any code, verify:
+- [ ] Could an LLM agent execute this feature using only the GraphQL schema as documentation?
+- [ ] Is business logic cleanly isolated in `services.py`?
+- [ ] Are all state changes tracked via Event Sourcing or `django-fsm`?
+- [ ] Are cross-plugin interactions handled via `hook_registry` rather than direct imports?
+- [ ] Is the new model using a UUID primary key?
+- [ ] Are all prices using `MoneyField`?
+- [ ] Is the code accounting for Headless Multi-Tenancy (`StoreChannel`)?

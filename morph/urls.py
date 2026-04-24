@@ -1,0 +1,19 @@
+"""
+Morpheus CMS — URL Configuration
+Plugin URLs are injected at runtime by the plugin registry.
+"""
+from django.contrib import admin
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('api.urls')),          # GraphQL at /graphql/
+    path('accounts/', include('allauth.urls')),
+    path('plugins/', include('plugins.urls')),
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

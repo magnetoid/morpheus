@@ -1,0 +1,10 @@
+"""Plugin middleware — injects active plugin URL patterns."""
+from django.urls import set_urlconf
+
+
+class PluginMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        return self.get_response(request)

@@ -1,0 +1,500 @@
+# Morpheus CMS — Living Architecture Document
+
+> **Status:** Phase 1 — Foundation
+> **Last updated:** 2026-04-24
+> **Rule:** This document is the source of truth. All code must follow this spec.
+> Update this document first before diverging from it.
+
+---
+
+## Vision
+
+> **Morpheus is the first ecommerce platform designed for a world where AI agents shop, sell, and operate stores.**
+
+Built for three kinds of users:
+1. **Human merchants** — a more powerful CMS than Shopify/Magento/WooCommerce
+2. **Human shoppers** — fast, personalized, beautiful storefront
+3. **AI agents** — can autonomously browse, purchase, manage inventory, run storefronts
+
+---
+
+## The Fundamental Principle
+
+> **The core contains nothing but the engine.**
+> Every model, every view, every API type, every admin panel — is a plugin.
+> Even "built-in" features like the product catalog, orders, and customers are plugins.
+> They just happen to ship **enabled by default**.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            MORPH CORE                                   │
+│   Plugin Registry · Hook Registry · GraphQL Assembler · Theme Engine    │
+│   Base Classes · Settings · Middleware · Celery                         │
+└─────────────────────────────────────────────────────────────────────────┘
+                              │ loads & wires
+         ┌────────────────────┼────────────────────┐
+         ▼                    ▼                    ▼
+  DEFAULT PLUGINS       DEFAULT PLUGINS       OPTIONAL PLUGINS
+  (enabled by default)  (enabled by default)  (disabled by default)
+  ┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+  │   catalog    │      │  storefront  │      │   reviews    │
+  │   orders     │      │ ai_assistant │      │   wishlist   │
+  │  customers   │      │  analytics   │      │loyalty_points│
+  │   payments   │      │             │      │  gift_cards  │
+  │  inventory   │      │             │      │  subscript.  │
+  │  marketing   │      │             │      │    pos       │
+  └──────────────┘      └──────────────┘      └──────────────┘
+```
+
+---
+
+## The 4 Pillars
+
+### Pillar 1 — Plugin Native (Everything is a plugin)
+
+**Rule:** If it can be removed and the engine still boots, it **must** be a plugin.
+
+Plugins are self-contained Python packages in `plugins/installed/`. A plugin can contain:
+- Django models + migrations
+- GraphQL types, queries, mutations
+- Django admin extensions
+- Celery tasks
+- Template tags / context processors
+- Static assets
+- Hook handlers
+- URL routes
+
+### Pillar 2 — GraphQL API First
+
+**Rule:** Every feature must exist as a GraphQL operation before any UI exists for it.
+
+One endpoint: `POST /graphql/`
+Schema assembled dynamically at startup from all active plugins.
+
+### Pillar 3 — Agent & AI First
+
+**Rule:** AI agents are first-class participants — as shoppers, operators, and intelligence.
+
+Dedicated agent auth, `agentCheckout` mutation, semantic search, LLM hooks on every major event.
+
+### Pillar 4 — Theme System
+
+**Rule:** Themes control only presentation. Zero business logic in themes.
+
+Themes skin the storefront plugin. Swappable at runtime with zero downtime.
+
+---
+
+## Two-Tier Plugin Activation
+
+This is the key architectural nuance. Plugins that define **Django models** must be known at startup (before the DB is connected), because Django needs to build the migration graph. Purely behavioral plugins can be toggled from the DB at runtime.
+
+### Tier 1 — INSTALLED_APPS level (startup config)
+Declared in `settings.py` via `MORPHEUS_DEFAULT_PLUGINS` and `MORPHEUS_EXTRA_PLUGINS` (from `.env`).
+These plugins' models, migrations, and admin are always available.
+Controls: **do the DB tables exist?**
+
+### Tier 2 — Behavioral activation (DB toggle)
+`PluginConfig` DB row per plugin. Toggled in the admin UI.
+Controls: **are the plugin's URLs, hooks, GraphQL types, and tasks active?**
+
+```
+Plugin has models?
+  YES → must be in INSTALLED_APPS (Tier 1). Can still be behaviorally disabled (Tier 2).
+  NO  → only needs Tier 2 (DB toggle). No INSTALLED_APPS entry needed.
+```
+
+### Default Plugin Sets
+
+**MORPHEUS_DEFAULT_PLUGINS** — always loaded, always active out of the box:
+```python
+MORPHEUS_DEFAULT_PLUGINS = [
+    'plugins.installed.catalog',      # Products, Categories, Variants, Reviews
+    'plugins.installed.orders',       # Cart, Order, Fulfillment, Refund
+    'plugins.installed.customers',    # Customer (AUTH_USER_MODEL), Addresses
+    'plugins.installed.payments',     # Payments, Gateways, Stripe Webhooks
+    'plugins.installed.inventory',    # Warehouses, StockLevel, StockMovement
+    'plugins.installed.marketing',    # Coupons, Redirects, Email Campaigns
+    'plugins.installed.analytics',    # Events, Funnels
+    'plugins.installed.storefront',   # Theme-powered storefront (plugin!)
+    'plugins.installed.ai_assistant', # LLM, semantic search, recommendations
+]
+```
+
+**MORPHEUS_OPTIONAL_PLUGINS** — shipped but disabled by default:
+```python
+MORPHEUS_OPTIONAL_PLUGINS = [
+    'plugins.installed.reviews',         # Product reviews & ratings
+    'plugins.installed.wishlist',         # Customer wishlists
+    'plugins.installed.loyalty_points',   # Points & rewards
+    'plugins.installed.gift_cards',       # Gift card system
+    'plugins.installed.subscriptions',    # Recurring orders
+    'plugins.installed.pos',              # Point of Sale
+    'plugins.installed.multi_vendor',     # Marketplace / multi-vendor
+    'plugins.installed.b2b',              # B2B pricing, quotes, net terms
+]
+```
+
+**Community plugins** — installed by merchants into `plugins/installed/`:
+```python
+# .env
+MORPHEUS_EXTRA_PLUGINS=plugins.installed.my_custom_plugin,plugins.installed.another_one
+```
+
+---
+
+## Plugin Anatomy
+
+A full plugin with models looks like this:
+
+```
+plugins/installed/catalog/
+├── plugin.py              ← MorpheusPlugin manifest (REQUIRED)
+├── apps.py                ← Django AppConfig
+├── models.py              ← Django models
+├── migrations/            ← Django migrations
+├── admin.py               ← Django admin registration
+├── graphql/
+│   ├── types.py           ← Strawberry type definitions
+│   ├── queries.py         ← Query resolvers
+│   └── mutations.py       ← Mutation resolvers
+├── services.py            ← Business logic (no HTTP, no GraphQL)
+├── hooks.py               ← Hook handlers (reacts to events from other plugins)
+├── signals.py             ← Django signals
+├── tasks.py               ← Celery tasks
+├── urls.py                ← URL routes (if plugin has views)
+├── views.py               ← Django views (if needed)
+├── templates/             ← Templates (overridden by active theme)
+├── static/                ← Static assets
+└── tests/
+    ├── test_models.py
+    ├── test_graphql.py
+    └── test_services.py
+```
+
+A **behavioral-only plugin** (no models) is simpler:
+```
+plugins/installed/analytics_gtm/
+├── plugin.py
+├── hooks.py               ← listens to order.placed, product.viewed etc.
+└── tasks.py
+```
+
+---
+
+## Plugin Base Class (`plugins/base.py`)
+
+```python
+class MorpheusPlugin:
+    # ── Metadata ───────────────────────────────────────────────────
+    name: str              # unique snake_case — matches directory name
+    label: str             # human-readable
+    version: str           # semver
+    description: str
+    author: str
+    requires: list[str]    # plugin names this depends on
+    conflicts: list[str]   # plugins this cannot coexist with
+    has_models: bool = False  # True if plugin defines Django models
+
+    # ── Lifecycle ──────────────────────────────────────────────────
+    def ready(self):
+        """Called when plugin is behaviorally activated. Register everything here."""
+        pass
+
+    def on_disable(self):
+        """Called when plugin is deactivated."""
+        pass
+
+    # ── Registration helpers (call inside ready()) ─────────────────
+    def register_urls(self, urlconf: str, prefix: str = ''): ...
+    def register_graphql_extension(self, module: str): ...
+    def register_hook(self, event: str, handler, priority: int = 50): ...
+    def register_admin(self, model, admin_class): ...
+    def register_celery_tasks(self, module: str): ...
+    def register_context_processor(self, func): ...
+
+    # ── Configuration ──────────────────────────────────────────────
+    def get_config_schema(self) -> dict:
+        """JSON Schema — rendered as settings UI in admin."""
+        return {}
+
+    def get_config(self) -> dict:
+        """Read current config from PluginConfig DB row."""
+        ...
+
+    def set_config(self, key: str, value) -> None: ...
+```
+
+---
+
+## Hook Registry (`core/hooks.py`)
+
+```
+Event                        Fired by           Default listeners
+─────────────────────────    ──────────────     ────────────────────────────────
+order.placed                 orders             inventory (reserve), ai (upsell)
+order.cancelled              orders             inventory (release), marketing
+payment.captured             payments           orders (confirm), email receipt
+payment.failed               payments           orders, email alert
+cart.abandoned               orders (Celery)    marketing (recovery email), ai
+product.viewed               storefront         analytics, ai (update model)
+product.low_stock            inventory          analytics, notifications
+customer.registered          customers          marketing (welcome email), ai
+search.performed             storefront/api     analytics, ai (tune results)
+ai.description_generated     ai_assistant       catalog (save to product)
+```
+
+Hook API:
+```python
+from core.hooks import hook_registry
+
+# Register (in plugin.ready()):
+hook_registry.register('order.placed', self.handle_order, priority=10)
+
+# Fire (in service layer — never in views or GraphQL resolvers):
+hook_registry.fire('order.placed', order=order)
+
+# Filter (transform data through a chain):
+price = hook_registry.filter('product.calculate_price', price=base_price, product=product)
+```
+
+---
+
+## GraphQL Schema Assembly (`api/schema.py`)
+
+```python
+import strawberry
+from plugins.registry import plugin_registry
+
+def build_schema():
+    query_bases = [CoreQuery] + plugin_registry.get_graphql_extensions('query')
+    mutation_bases = [CoreMutation] + plugin_registry.get_graphql_extensions('mutation')
+
+    @strawberry.type
+    class Query(*query_bases): pass
+
+    @strawberry.type
+    class Mutation(*mutation_bases): pass
+
+    return strawberry.Schema(
+        query=Query,
+        mutation=Mutation,
+        extensions=[QueryDepthLimiter, AgentContextExtension],
+    )
+
+schema = build_schema()
+```
+
+---
+
+## Directory Structure (Final)
+
+```
+morph/
+│
+├── morph/                           # Django project config ONLY
+│   ├── settings.py                  # Loads plugins into INSTALLED_APPS
+│   ├── urls.py                      # Only: /graphql/, /admin/, plugin aggregator
+│   ├── celery.py
+│   ├── wsgi.py
+│   └── asgi.py
+│
+├── core/                            # ★ ENGINE ONLY — no business logic
+│   ├── hooks.py                     # HookRegistry
+│   ├── models.py                    # StoreSettings ONLY (needed at engine level)
+│   ├── context_processors.py
+│   ├── middleware.py
+│   └── admin.py                     # Morph admin site config
+│
+├── api/                             # ★ GraphQL layer — assembles from plugins
+│   ├── schema.py                    # Dynamic schema assembly
+│   ├── urls.py                      # /graphql/ + /graphql/agent/
+│   ├── client.py                    # Internal GraphQL client
+│   └── permissions.py
+│
+├── plugins/                         # ★ PLUGIN ENGINE
+│   ├── base.py                      # MorpheusPlugin base class
+│   ├── registry.py                  # Discovery, lifecycle, activation
+│   ├── middleware.py                # Inject active plugin URLs per request
+│   ├── context_processors.py
+│   └── installed/                   # ← EVERYTHING LIVES HERE
+│       │
+│       ├── catalog/                 # DEFAULT ✓ — Products, Categories, Variants
+│       │   ├── plugin.py
+│       │   ├── models.py
+│       │   ├── migrations/
+│       │   ├── graphql/
+│       │   ├── services.py
+│       │   ├── admin.py
+│       │   └── ...
+│       │
+│       ├── orders/                  # DEFAULT ✓ — Cart, Order, Fulfillment
+│       │   └── ...
+│       │
+│       ├── customers/               # DEFAULT ✓ — Customer (AUTH_USER_MODEL)
+│       │   └── ...
+│       │
+│       ├── payments/                # DEFAULT ✓ — Stripe, multi-gateway
+│       │   └── ...
+│       │
+│       ├── inventory/               # DEFAULT ✓ — Warehouses, Stock
+│       │   └── ...
+│       │
+│       ├── marketing/               # DEFAULT ✓ — Coupons, Campaigns
+│       │   └── ...
+│       │
+│       ├── analytics/               # DEFAULT ✓ — Events, Funnels
+│       │   └── ...
+│       │
+│       ├── storefront/              # DEFAULT ✓ — Theme-powered frontend
+│       │   ├── plugin.py
+│       │   ├── views.py             # Queries own GraphQL API — never ORM directly
+│       │   ├── urls.py
+│       │   ├── templates/           # Overridden by active theme
+│       │   └── static/
+│       │
+│       ├── ai_assistant/            # DEFAULT ✓ — LLM, semantic search, agents
+│       │   ├── plugin.py
+│       │   ├── models.py            # AIInteraction log, AIPromptTemplate
+│       │   ├── services/
+│       │   │   ├── llm.py           # Swappable LLM gateway
+│       │   │   ├── embeddings.py
+│       │   │   ├── rag.py
+│       │   │   └── recommendations.py
+│       │   ├── graphql/
+│       │   │   ├── types.py         # AgentCapabilities, AIResponse, etc.
+│       │   │   ├── queries.py       # recommendations, semanticSearch, chatMessage
+│       │   │   └── mutations.py     # agentCheckout, generateDescription, optimizePrice
+│       │   └── tasks.py
+│       │
+│       ├── reviews/                 # OPTIONAL ○ — Product reviews & ratings
+│       ├── wishlist/                # OPTIONAL ○
+│       ├── loyalty_points/          # OPTIONAL ○
+│       ├── gift_cards/              # OPTIONAL ○
+│       ├── subscriptions/           # OPTIONAL ○
+│       ├── pos/                     # OPTIONAL ○
+│       ├── multi_vendor/            # OPTIONAL ○
+│       └── b2b/                     # OPTIONAL ○
+│
+├── themes/                          # ★ THEME ENGINE
+│   ├── base.py                      # MorpheusTheme base class
+│   ├── registry.py
+│   ├── middleware.py                # Set active theme per request
+│   ├── loaders.py                   # Theme-aware Django template loader
+│   ├── models.py                    # ThemeConfig
+│   └── library/                     # ← THEMES LIVE HERE
+│       └── aurora/                  # Built-in default theme
+│           ├── theme.py
+│           ├── templates/
+│           ├── static/
+│           └── config_schema.json
+│
+├── templates/                       # Global fallback templates only
+├── static/                          # Global static only
+├── media/
+├── ARCHITECTURE.md
+├── requirements.txt
+└── .env.example
+```
+
+---
+
+## Storefront Plugin — GraphQL-First Pattern
+
+The storefront plugin **never imports from other plugin models directly**. It only talks to the GraphQL API via an internal client. This is enforced by convention and linting.
+
+```python
+# plugins/installed/storefront/views.py
+from api.client import internal_graphql   # ← ONLY allowed data access
+
+def product_list(request):
+    result = internal_graphql("""
+        query ProductList($first: Int!, $category: String) {
+          products(first: $first, category: $category) {
+            edges { node { id name slug price { amount currency } primaryImage { url } } }
+          }
+        }
+    """, variables={"first": 24, "category": request.GET.get('cat')}, request=request)
+    return render(request, 'storefront/product_list.html', result)
+```
+
+This means: **the storefront is a living integration test of the GraphQL API**.
+
+---
+
+## AI Agent Flow
+
+```
+AI Agent → POST /graphql/agent/
+  Authorization: AgentToken abc123
+
+  → AgentAuthMiddleware: verify, load AgentCapabilities (budget, categories, permissions)
+  → mutation agentCheckout(items: [...]) {
+      → validate items within agent budget & allowed categories
+      → reuse same CartService, OrderService as human checkout
+      → return { order { orderNumber total } receipt { lineItems tax shipping } }
+    }
+```
+
+Agents are rate-limited separately from humans and have explicit capability scopes (read-only, purchase-allowed, inventory-manage).
+
+---
+
+## Implementation Checklist (Phase 1)
+
+### Engine (core + api + plugins engine + themes engine)
+- [x] Django project scaffold
+- [x] Supabase PostgreSQL with SSL
+- [ ] `core/hooks.py` — HookRegistry
+- [ ] `core/models.py` — StoreSettings only
+- [ ] `plugins/base.py` — MorpheusPlugin base class
+- [ ] `plugins/registry.py` — discovery, two-tier activation
+- [ ] `plugins/middleware.py`
+- [ ] `themes/base.py` — MorpheusTheme base class
+- [ ] `themes/registry.py` + `themes/loaders.py`
+- [ ] `api/schema.py` — dynamic schema assembly
+- [ ] `api/client.py` — internal GraphQL client
+- [ ] `morph/settings.py` — load plugins into INSTALLED_APPS dynamically
+
+### Default Plugins — Models
+- [x] `catalog` models (moved → `plugins/installed/catalog/models.py`)
+- [x] `orders` models (→ `plugins/installed/orders/models.py`)
+- [x] `customers` models (→ `plugins/installed/customers/models.py`)
+- [x] `payments` models (→ `plugins/installed/payments/models.py`)
+- [x] `inventory` models (→ `plugins/installed/inventory/models.py`)
+- [x] `marketing` models (→ `plugins/installed/marketing/models.py`)
+- [ ] All models need plugin.py manifests + apps.py + migrations
+- [ ] `ai_assistant` — AIInteraction, AIPromptTemplate models
+
+### Default Plugins — GraphQL
+- [ ] `catalog` — types, queries (products, product, categories, search)
+- [ ] `orders` — types, mutations (addToCart, checkout, createOrder)
+- [ ] `customers` — types, mutations (register, login, updateProfile)
+- [ ] `ai_assistant` — types, queries (semanticSearch, recommendations, chatMessage)
+- [ ] `ai_assistant` — mutations (agentCheckout, generateDescription)
+
+### Default Plugins — Storefront
+- [ ] `storefront/plugin.py`
+- [ ] `storefront/views.py` (GraphQL-consuming)
+- [ ] `themes/library/aurora/` — first theme
+
+### Final
+- [ ] All migrations
+- [ ] Django admin customisation
+- [ ] Working `/graphql/` explorer (GraphiQL)
+- [ ] `manage.py runserver` green
+
+---
+
+## Rules for Contributors
+
+1. **GraphQL first** — API operation before UI
+2. **Service layer for logic** — business logic in `services.py`, never in views/resolvers
+3. **Hooks for cross-plugin events** — never import between plugins directly
+4. **No ORM in storefront views** — data from `internal_graphql()` only
+5. **No logic in themes** — themes are HTML/CSS/JS only
+6. **All money = MoneyField** — never FloatField or raw DecimalField
+7. **All PKs = UUID** — no auto-increment integers
+8. **All stock changes via StockMovement.record()** — never raw `.save()`
+9. **All AI calls logged to AIInteraction** — always
+10. **Models live inside their plugin** — never in a standalone Django app

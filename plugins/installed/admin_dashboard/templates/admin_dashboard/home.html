@@ -1,0 +1,137 @@
+{% extends "admin_dashboard/base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <div class="flex items-center space-x-2">
+            <button class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--ring))] disabled:pointer-events-none disabled:opacity-50 border border-[hsl(var(--input))] bg-transparent shadow-sm hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))] h-9 px-4 py-2">
+                <i data-lucide="calendar" class="mr-2 h-4 w-4"></i> Last 30 Days
+            </button>
+            <button class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--ring))] disabled:pointer-events-none disabled:opacity-50 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow hover:bg-[hsl(var(--primary))]/90 h-9 px-4 py-2">
+                Download Report
+            </button>
+        </div>
+    </div>
+
+    <!-- AI Insights Banner (Law 0: Agentic First) -->
+    {% if data.merchantInsights %}
+    <div class="card rounded-lg border bg-amber-50/50 text-amber-900 shadow-sm p-6 dark:bg-amber-950/20 dark:text-amber-200 dark:border-amber-900/50">
+        <div class="flex items-start">
+            <div class="bg-amber-100 dark:bg-amber-900/50 rounded-full p-2 mr-4 mt-1">
+                <i data-lucide="sparkles" class="h-5 w-5 text-amber-600 dark:text-amber-400"></i>
+            </div>
+            <div class="flex-1">
+                <h3 class="font-semibold tracking-tight text-lg mb-1">Morpheus AI Insight</h3>
+                <p class="text-sm opacity-90 mb-4">{{ data.merchantInsights.0.body }}</p>
+                <div class="flex space-x-3">
+                    <button class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none bg-amber-600 text-white shadow hover:bg-amber-700 h-8 px-4 py-2">
+                        Execute Suggested Action
+                    </button>
+                    <button class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none border border-amber-200 bg-transparent hover:bg-amber-100 dark:border-amber-800 dark:hover:bg-amber-900/50 h-8 px-4 py-2">
+                        Dismiss
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Metrics Grid -->
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <!-- Revenue -->
+        <div class="card rounded-xl border bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow p-6">
+            <div class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <h3 class="tracking-tight text-sm font-medium">Total Revenue</h3>
+                <i data-lucide="dollar-sign" class="h-4 w-4 text-[hsl(var(--muted-foreground))]"></i>
+            </div>
+            <div class="text-2xl font-bold">
+                {{ data.metrics.totalRevenue.currency }} {{ data.metrics.totalRevenue.amount|default:"0.00" }}
+            </div>
+            <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                <span class="text-emerald-500 font-medium">+{{ data.metrics.revenueGrowthPercentage|default:"0" }}%</span> from last month
+            </p>
+        </div>
+
+        <!-- Orders -->
+        <div class="card rounded-xl border bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow p-6">
+            <div class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <h3 class="tracking-tight text-sm font-medium">Orders</h3>
+                <i data-lucide="shopping-bag" class="h-4 w-4 text-[hsl(var(--muted-foreground))]"></i>
+            </div>
+            <div class="text-2xl font-bold">{{ data.metrics.totalOrders|default:"0" }}</div>
+            <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                +19% from last month
+            </p>
+        </div>
+
+        <!-- Customers -->
+        <div class="card rounded-xl border bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow p-6">
+            <div class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <h3 class="tracking-tight text-sm font-medium">Active Customers</h3>
+                <i data-lucide="users" class="h-4 w-4 text-[hsl(var(--muted-foreground))]"></i>
+            </div>
+            <div class="text-2xl font-bold">{{ data.metrics.activeCustomers|default:"0" }}</div>
+            <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                +74 since last week
+            </p>
+        </div>
+
+        <!-- Conversion -->
+        <div class="card rounded-xl border bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow p-6">
+            <div class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <h3 class="tracking-tight text-sm font-medium">Conversion Rate</h3>
+                <i data-lucide="activity" class="h-4 w-4 text-[hsl(var(--muted-foreground))]"></i>
+            </div>
+            <div class="text-2xl font-bold">3.2%</div>
+            <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                <span class="text-emerald-500 font-medium">+1.1%</span> from last month
+            </p>
+        </div>
+    </div>
+
+    <!-- Main Data Grid -->
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <!-- Chart placeholder -->
+        <div class="card rounded-xl border bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow col-span-4 p-6">
+            <div class="flex flex-col space-y-1.5 mb-4">
+                <h3 class="font-semibold leading-none tracking-tight">Overview</h3>
+            </div>
+            <div class="h-[300px] w-full flex items-center justify-center bg-[hsl(var(--muted))] rounded-md border border-dashed border-[hsl(var(--border))]">
+                <div class="text-center">
+                    <i data-lucide="bar-chart-3" class="mx-auto h-8 w-8 text-[hsl(var(--muted-foreground))] mb-2"></i>
+                    <p class="text-sm text-[hsl(var(--muted-foreground))]">Chart integration pending</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Sales -->
+        <div class="card rounded-xl border bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow col-span-3 p-6">
+            <div class="flex flex-col space-y-1.5 mb-4">
+                <h3 class="font-semibold leading-none tracking-tight">Recent Sales</h3>
+                <p class="text-sm text-[hsl(var(--muted-foreground))]">You made 265 sales this month.</p>
+            </div>
+            <div class="space-y-8">
+                {% for order in data.recentOrders %}
+                <div class="flex items-center">
+                    <div class="h-9 w-9 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center font-semibold text-sm">
+                        {{ order.customer.fullName|default:order.customer.email|make_list|first|upper }}
+                    </div>
+                    <div class="ml-4 space-y-1">
+                        <p class="text-sm font-medium leading-none">{{ order.customer.fullName|default:"Guest" }}</p>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))]">{{ order.customer.email }}</p>
+                    </div>
+                    <div class="ml-auto font-medium">
+                        +{{ order.total.currency }} {{ order.total.amount }}
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-4 text-sm text-[hsl(var(--muted-foreground))]">
+                    No recent orders.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

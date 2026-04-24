@@ -1,0 +1,65 @@
+{% extends "admin_dashboard/base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-3xl font-bold tracking-tight">Orders</h1>
+    </div>
+
+    <div class="card rounded-md border bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow">
+        <div class="p-4 flex items-center gap-4">
+            <div class="relative flex-1 max-w-sm">
+                <i data-lucide="search" class="absolute left-2.5 top-2.5 h-4 w-4 text-[hsl(var(--muted-foreground))]"></i>
+                <input type="text" placeholder="Filter orders..." class="h-9 w-full rounded-md border border-[hsl(var(--input))] bg-transparent px-3 py-1 pl-9 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--ring))]">
+            </div>
+            <div class="flex space-x-2">
+                <button class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-[hsl(var(--input))] bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] h-9 px-4 py-2">All</button>
+                <button class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-[hsl(var(--input))] bg-transparent hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))] h-9 px-4 py-2">Unfulfilled</button>
+                <button class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-[hsl(var(--input))] bg-transparent hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))] h-9 px-4 py-2">Unpaid</button>
+            </div>
+        </div>
+        
+        <div class="relative w-full overflow-auto">
+            <table class="w-full caption-bottom text-sm">
+                <thead class="[&_tr]:border-b border-[hsl(var(--border))]">
+                    <tr class="border-b transition-colors hover:bg-[hsl(var(--muted))]/50 data-[state=selected]:bg-[hsl(var(--muted))]">
+                        <th class="h-12 px-4 text-left align-middle font-medium text-[hsl(var(--muted-foreground))] w-[50px]">
+                            <input type="checkbox" class="h-4 w-4 rounded border-[hsl(var(--primary))] text-[hsl(var(--primary))] focus:ring-[hsl(var(--primary))]">
+                        </th>
+                        <th class="h-12 px-4 text-left align-middle font-medium text-[hsl(var(--muted-foreground))]">Order</th>
+                        <th class="h-12 px-4 text-left align-middle font-medium text-[hsl(var(--muted-foreground))]">Date</th>
+                        <th class="h-12 px-4 text-left align-middle font-medium text-[hsl(var(--muted-foreground))]">Customer</th>
+                        <th class="h-12 px-4 text-left align-middle font-medium text-[hsl(var(--muted-foreground))]">Status</th>
+                        <th class="h-12 px-4 text-right align-middle font-medium text-[hsl(var(--muted-foreground))]">Total</th>
+                    </tr>
+                </thead>
+                <tbody class="[&_tr:last-child]:border-0">
+                    {% for order in data.orders %}
+                    <tr class="border-b border-[hsl(var(--border))] transition-colors hover:bg-[hsl(var(--muted))]/50">
+                        <td class="p-4 align-middle">
+                            <input type="checkbox" class="h-4 w-4 rounded border-[hsl(var(--primary))] text-[hsl(var(--primary))] focus:ring-[hsl(var(--primary))]">
+                        </td>
+                        <td class="p-4 align-middle font-medium">#{{ order.orderNumber }}</td>
+                        <td class="p-4 align-middle text-[hsl(var(--muted-foreground))]">Just now</td>
+                        <td class="p-4 align-middle">Customer</td>
+                        <td class="p-4 align-middle">
+                            <div class="inline-flex items-center rounded-full border border-transparent bg-amber-500/15 text-amber-700 px-2.5 py-0.5 text-xs font-semibold capitalize">{{ order.status }}</div>
+                        </td>
+                        <td class="p-4 align-middle text-right font-medium">{{ order.total.amount }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="p-8 text-center text-[hsl(var(--muted-foreground))]">
+                            <div class="flex flex-col items-center justify-center space-y-3">
+                                <i data-lucide="shopping-bag" class="h-10 w-10 text-[hsl(var(--muted-foreground))]/50"></i>
+                                <div>No orders found.</div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
