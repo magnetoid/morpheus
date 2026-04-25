@@ -1,4 +1,5 @@
 {% extends "storefront/base.html" %}
+{% load morph %}
 {% block title %}{{ product.name }} — dot books{% endblock %}
 
 {% block content %}
@@ -44,10 +45,12 @@
         <h1 class="display display-l" style="margin: 1rem 0 0.75rem;">{{ product.name }}<span class="text-accent">.</span></h1>
         <p class="lede" style="margin-bottom: 1.5rem;">{{ product.short_description|default:"" }}</p>
 
-        <div style="display:flex; align-items:baseline; gap: 0.6rem; margin: 1.5rem 0 2rem;">
+        <div style="display:flex; align-items:baseline; gap: 0.6rem; margin: 1.5rem 0 0.5rem;">
           <span style="font-family: var(--serif); font-size: 1.75rem; font-weight: 600;">{{ product.price }}</span>
           {% if product.is_on_sale %}<span class="meta" style="text-decoration: line-through;">{{ product.compare_at_price }}</span>{% endif %}
         </div>
+
+        {% storefront_blocks "pdp_below_price" %}
 
         {% if product.variants.all %}
         <div style="margin-bottom: 1.5rem;">

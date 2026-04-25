@@ -54,6 +54,7 @@ MORPHEUS_DEFAULT_PLUGINS = [
     'plugins.installed.cloudflare',
     'plugins.installed.seo',
     'plugins.installed.demo_data',
+    'plugins.installed.advanced_ecommerce',
 ]
 
 # ── Extra plugins installed by merchant via .env ───────────────────────────────

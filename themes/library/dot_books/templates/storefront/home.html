@@ -1,7 +1,9 @@
 {% extends "storefront/base.html" %}
+{% load morph %}
 {% block title %}dot books. — a quieter shelf for louder books{% endblock %}
 
 {% block content %}
+{% storefront_blocks "home_above_grid" %}
 
 <!-- Hero -->
 <section style="padding-top: 3rem; padding-bottom: 3rem;">
@@ -191,5 +193,7 @@
 <style>
 @media (min-width: 900px) { .journal-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 2.5rem !important; } }
 </style>
+
+{% storefront_blocks "home_below_grid" %}
 
 {% endblock %}

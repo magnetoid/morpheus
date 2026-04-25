@@ -1,0 +1,18 @@
+{# Single product card for the recently-viewed rail. Looked up by slug. #}
+{% load morph %}
+{% recently_viewed_product slug as product %}
+{% if product %}
+<a href="/products/{{ product.slug }}/" class="book">
+  <div class="cover-wrap">
+    {% if product.primary_image %}
+      <img src="{{ product.primary_image.image.url }}" alt="{{ product.name }}">
+    {% else %}
+      <div class="placeholder">{{ product.name|truncatewords:3 }}</div>
+    {% endif %}
+  </div>
+  <div>
+    <p class="title">{{ product.name }}</p>
+    <p class="price">{{ product.price }}</p>
+  </div>
+</a>
+{% endif %}

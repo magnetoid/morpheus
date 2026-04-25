@@ -1,0 +1,19 @@
+{# Recently-viewed rail. Reads slugs from request.session['recently_viewed']. #}
+{% if request.session.recently_viewed %}
+{% load static %}
+<section style="padding: 4rem 0; background: var(--paper-2);">
+  <div class="wrap">
+    <div style="display:flex; align-items:end; justify-content:space-between; gap:1rem; margin-bottom: 2rem;">
+      <div>
+        <p class="eyebrow">Picked back up</p>
+        <h2 class="display display-m" style="margin-top: 0.6rem;">Recently viewed<span class="text-accent">.</span></h2>
+      </div>
+    </div>
+    <div class="grid-books">
+      {% for slug in request.session.recently_viewed %}
+        {% include "advanced_ecommerce/blocks/_recently_viewed_card.html" with slug=slug %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
