@@ -84,6 +84,8 @@ Morpheus wins by being infinitely scalable, horizontally extensible via a rigoro
 
 ## Quick Reference Checklist for PRs
 
+> Before writing code, scan [`SKILLS.md`](SKILLS.md) for the matching skill. If your change isn't covered by an existing skill, **add or update one in the same PR**.
+
 Before merging any code, verify:
 - [ ] Could an LLM agent execute this feature using only the GraphQL schema as documentation?
 - [ ] Is business logic cleanly isolated in `services.py`?
@@ -92,3 +94,5 @@ Before merging any code, verify:
 - [ ] Is the new model using a UUID primary key?
 - [ ] Are all prices using `MoneyField`?
 - [ ] Is the code accounting for Headless Multi-Tenancy (`StoreChannel`)?
+- [ ] Tests pass and `manage.py makemigrations --check --dry-run` is clean.
+- [ ] [`SKILLS.md`](SKILLS.md) reflects the new procedure (or the change is covered by an existing skill).

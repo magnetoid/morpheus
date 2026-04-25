@@ -1,9 +1,9 @@
 # Morpheus CMS — Living Architecture Document
 
-> **Status:** Phase 1 — Foundation
-> **Last updated:** 2026-04-24
-> **Rule:** This document is the source of truth. All code must follow this spec.
-> Update this document first before diverging from it.
+> **Status:** Phase 1 shipped (sprints 1–9). Phase 2 in progress.
+> **Last updated:** 2026-04-25
+> **Procedural companion:** [`SKILLS.md`](SKILLS.md) — every change here must have a matching skill.
+> **Rule:** This document is the source of truth for *what* and *why*. `SKILLS.md` is the source of truth for *how*. The platform laws live in [`RULES.md`](RULES.md).
 
 ---
 
@@ -106,34 +106,38 @@ Plugin has models?
 
 ### Default Plugin Sets
 
-**MORPHEUS_DEFAULT_PLUGINS** — always loaded, always active out of the box:
+**MORPHEUS_DEFAULT_PLUGINS** — always loaded, auto-enabled on first boot:
 ```python
 MORPHEUS_DEFAULT_PLUGINS = [
-    'plugins.installed.catalog',      # Products, Categories, Variants, Reviews
-    'plugins.installed.orders',       # Cart, Order, Fulfillment, Refund
-    'plugins.installed.customers',    # Customer (AUTH_USER_MODEL), Addresses
-    'plugins.installed.payments',     # Payments, Gateways, Stripe Webhooks
-    'plugins.installed.inventory',    # Warehouses, StockLevel, StockMovement
-    'plugins.installed.marketing',    # Coupons, Redirects, Email Campaigns
-    'plugins.installed.analytics',    # Events, Funnels
-    'plugins.installed.storefront',   # Theme-powered storefront (plugin!)
-    'plugins.installed.ai_assistant', # LLM, semantic search, recommendations
+    # ── Commerce core ────────────────────────────────────────────────
+    'plugins.installed.catalog',       # Products, Variants, Categories, Collections, Vendors, Reviews
+    'plugins.installed.orders',        # Cart, Order (FSM), Fulfillment, Refund, OrderEvent
+    'plugins.installed.customers',     # Customer (AUTH_USER_MODEL), Addresses
+    'plugins.installed.payments',      # Payment provider façade, Stripe webhooks
+    'plugins.installed.inventory',     # Warehouses, StockLevel, StockMovement
+    'plugins.installed.marketing',     # Coupons, campaigns, redirects
+    'plugins.installed.analytics',     # Funnel events
+    'plugins.installed.storefront',    # Theme-powered storefront (plugin!)
+    'plugins.installed.admin_dashboard',# Merchant admin UI
+    # ── AI & agent surface ──────────────────────────────────────────
+    'plugins.installed.ai_assistant',  # Agent intents, signed receipts, semantic search, dynamic pricing
+    'plugins.installed.ai_content',    # Generative product copy
+    # ── Platform extensions ─────────────────────────────────────────
+    'plugins.installed.functions',     # Sandboxed merchant-defined logic
+    'plugins.installed.importers',     # Shopify, WooCommerce, … (idempotent)
+    'plugins.installed.observability', # Per-merchant MerchantMetric rollups, ErrorEvent log
+    'plugins.installed.environments',  # Dev/staging/prod with snapshots + promotion
+    'plugins.installed.affiliates',    # Programs, links, attribution, payouts
+    'plugins.installed.marketplace',   # Multivendor: vendor onboarding, order splitting, payouts
 ]
 ```
 
-**MORPHEUS_OPTIONAL_PLUGINS** — shipped but disabled by default:
-```python
-MORPHEUS_OPTIONAL_PLUGINS = [
-    'plugins.installed.reviews',         # Product reviews & ratings
-    'plugins.installed.wishlist',         # Customer wishlists
-    'plugins.installed.loyalty_points',   # Points & rewards
-    'plugins.installed.gift_cards',       # Gift card system
-    'plugins.installed.subscriptions',    # Recurring orders
-    'plugins.installed.pos',              # Point of Sale
-    'plugins.installed.multi_vendor',     # Marketplace / multi-vendor
-    'plugins.installed.b2b',              # B2B pricing, quotes, net terms
-]
-```
+The plugin registry topologically sorts these by `requires` and activates them
+in dependency order. Newly discovered plugins are auto-enabled on first boot
+(see [`plugins/registry.py`](plugins/registry.py)).
+
+**OPTIONAL — opt-in via `MORPHEUS_EXTRA_PLUGINS`:**
+- `loyalty_points`, `wishlist`, `gift_cards`, `subscriptions`, `pos`, `b2b`
 
 **Community plugins** — installed by merchants into `plugins/installed/`:
 ```python
