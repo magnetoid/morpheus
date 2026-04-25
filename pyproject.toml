@@ -1,0 +1,78 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [
+    "venv",
+    ".venv",
+    "*/migrations/*",
+    "staticfiles",
+    "media",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "DJ",   # flake8-django
+    "S",    # bandit
+    "PL",   # pylint
+]
+ignore = [
+    "E501",     # line length handled by formatter
+    "S101",     # assert use (tests)
+    "PLR0913",  # too many arguments
+    "PLR2004",  # magic numbers
+    "S105",     # hardcoded password False positive on cls vars
+    "S106",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S", "PLR"]
+"**/test_*.py" = ["S", "PLR"]
+"*/settings.py" = ["S105"]
+"manage.py" = ["S"]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+follow_imports = "silent"
+exclude = "(venv|\\.venv|migrations|staticfiles)"
+plugins = []
+
+[[tool.mypy.overrides]]
+module = ["*.migrations.*"]
+ignore_errors = true
+
+[tool.bandit]
+exclude_dirs = ["venv", ".venv", "tests", "*/migrations/*", "db.sqlite3"]
+skips = ["B101"]
+
+[tool.coverage.run]
+branch = true
+source = ["."]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/test_*.py",
+    "manage.py",
+    "venv/*",
+    "morph/asgi.py",
+    "morph/wsgi.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false

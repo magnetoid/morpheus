@@ -227,7 +227,9 @@ class MorpheusPlugin:
 
 ---
 
-## Hook Registry (`core/hooks.py`)
+## Hook Registry & Transactional Outbox (`core/hooks.py`)
+
+Morpheus relies on an immutable event-driven architecture. To guarantee zero data loss between the primary database and the event bus, we use the **Transactional Outbox Pattern**.
 
 ```
 Event                        Fired by           Default listeners
@@ -239,6 +241,7 @@ payment.failed               payments           orders, email alert
 cart.abandoned               orders (Celery)    marketing (recovery email), ai
 product.viewed               storefront         analytics, ai (update model)
 product.low_stock            inventory          analytics, notifications
+product.out_of_stock         inventory          analytics, store alerts
 customer.registered          customers          marketing (welcome email), ai
 search.performed             storefront/api     analytics, ai (tune results)
 ai.description_generated     ai_assistant       catalog (save to product)
@@ -252,11 +255,37 @@ from core.hooks import hook_registry
 hook_registry.register('order.placed', self.handle_order, priority=10)
 
 # Fire (in service layer — never in views or GraphQL resolvers):
+# This writes to the `OutboxEvent` table atomically with your DB transaction.
 hook_registry.fire('order.placed', order=order)
 
 # Filter (transform data through a chain):
 price = hook_registry.filter('product.calculate_price', price=base_price, product=product)
 ```
+
+### The Outbox Flow
+1. **Mutation**: A domain service modifies state (e.g., creating an order).
+2. **Hook**: The service calls `hook_registry.fire()`.
+3. **Outbox Save**: The Hook Registry serializes the payload using `WebhookEncoder` and saves an `OutboxEvent` to the database *in the same transaction*.
+4. **Publish**: A Celery worker (`process_outbox`) polls pending events and reliably publishes them to **NATS JetStream** (`morpheus_events` stream).
+5. **Consumption**: Remote services and workers subscribe to NATS to execute side-effects.
+
+---
+
+## Observability & Log Aggregation
+
+Morpheus provides enterprise-grade observability out of the box using OpenTelemetry.
+
+- **Distributed Tracing**: Python's `logging`, Celery, Redis, and Psycopg2 are automatically instrumented. Every log line contains `trace_id` and `span_id`.
+- **Log Aggregation**: Docker container logs are scraped by **Vector**, parsed as JSON, and shipped to **Grafana Loki**.
+- **Metrics**: **Prometheus** scrapes metrics from the OpenTelemetry Collector and Celery workers.
+
+---
+
+## Autoscaling & GitOps
+
+Morpheus is designed for horizontally scalable Kubernetes environments.
+- **KEDA (Kubernetes Event-driven Autoscaling)**: The Celery workers are scaled dynamically based on the queue depth (lag) of the NATS JetStream `morpheus_events` topic.
+- **Autonomous Ops Agent**: An AI-powered ops agent continuously monitors Prometheus metrics. If a scaling threshold is breached, the agent uses `PyGithub` to author a GitOps Pull Request against the `main` branch, modifying the `replicas` count in the Kubernetes manifests.
 
 ---
 

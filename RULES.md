@@ -37,11 +37,12 @@ Morpheus wins by being infinitely scalable, horizontally extensible via a rigoro
 - The storefront is a living integration test of the API. Bypassing the API hides bugs.
 - **Never** import models from `plugins/installed/*/models.py` inside a theme or storefront view.
 
-### LAW 4 — Plugins Communicate Via Hooks
+### LAW 4 — Plugins Communicate Via Hooks & Outbox
 **Plugins do not import from each other's internals. They use the hook registry.**
 - Use `from core.hooks import hook_registry, MorpheusEvents`.
 - Use `hook_registry.fire()` to trigger side-effects (e.g. `ORDER_PAID` triggers inventory reduction).
-- Remote Plugins (external Node/Go services) automatically receive these events via `WebhookEndpoint` Celery dispatch.
+- Under the hood, `hook_registry.fire()` atomically writes to the `OutboxEvent` table. A Celery worker (`process_outbox`) reliably publishes these events to **NATS JetStream** to guarantee zero data loss.
+- Remote Plugins (external Node/Go services) automatically receive these events via `WebhookEndpoint` or by directly subscribing to the NATS JetStream topics.
 
 ### LAW 5 — Business Logic Lives in Services
 **Views receive HTTP. Resolvers receive GraphQL. Services do the work.**
@@ -72,6 +73,12 @@ Morpheus wins by being infinitely scalable, horizontally extensible via a rigoro
 **Morpheus is built to serve Holding Companies and Headless architectures.**
 - All top-level entities (Products, Orders) must map to a `StoreChannel` for multi-tenancy.
 - API requests using Bearer tokens must be verified via `MorpheusAPIKeyAuthentication` to ensure agents and third-party tools do not exceed their authorized capabilities (`scopes`).
+
+### LAW 11 — Observable by Design
+**If it isn't traced and logged properly, it didn't happen.**
+- Use the standard `logging` module. OpenTelemetry automatically injects `trace_id` and `span_id` into every log line.
+- Do not log raw PII or PCI data.
+- Ensure all Celery tasks and database queries occur within an active trace context to maintain request/event correlation across the web and worker containers.
 
 ---
 

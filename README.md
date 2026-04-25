@@ -1,122 +1,228 @@
 # Morpheus Engine
 
 <div align="center">
-  <p><strong>The first commerce platform built natively for AI Agents.</strong></p>
-  <p>What Shopify would be if it were built today.</p>
+  <p><strong>The first commerce platform built natively for AI agents.</strong></p>
+  <p>Open-source. Plugin-native. Event-sourced. Production-grade.</p>
 </div>
 
 ---
 
-## ⚡️ The Mission
+## Why Morpheus
 
-Legacy platforms (Shopify, Magento, BigCommerce) were built for a world that no longer exists. They treat AI as an afterthought or a third-party API consumer.
+Legacy platforms (Shopify, WooCommerce, Magento, Spree, BigCommerce) treat AI as a third-party API consumer. Morpheus treats AI agents as the **primary audience**: every feature, schema, and state transition is designed to be machine-actionable first, human-pretty second.
 
-**Morpheus is different.** We treat AI agents as the *primary audience*. Every feature, endpoint, and capability must be fully understandable and executable by an LLM before a human UI is ever built. 
+The result is a stack that beats incumbents on three axes:
 
-By designing for agents first, we are forced to build cleaner schemas, stricter state machines, and more actionable error handling. The result is a platform that is infinitely scalable, horizontally extensible via a rigorous plugin architecture, and completely free from legacy vendor lock-in.
-
----
-
-## ✨ Core Architecture
-
-Morpheus is a lightweight engine powering a massive plugin ecosystem. The core contains almost no business logic—everything from Products to Orders to the AI Assistant itself is an isolated plugin.
-
-### 🤖 1. Agentic-First Design
-Every Morpheus instance auto-generates LLM tool manifests directly from the live GraphQL schema. Any LLM with tool-use can immediately shop, manage inventory, or run marketing campaigns with zero custom integration code.
-- `GET /api/agent-tools/openai.json` → OpenAI function calling format
-- `GET /api/agent-tools/anthropic.json` → Anthropic tool use format
-- **Model Context Protocol (MCP)** support built-in natively.
-
-### 🔌 2. 100% Plugin Driven
-The core provides only infrastructure: Event Bus, Registry, Caching, and RBAC. 
-If a feature can be removed and the engine still boots, it is a plugin.
-- **Native Plugins:** Django apps living in `plugins/installed/`.
-- **Remote Plugins:** External Node/Go/Rust microservices that subscribe to Morpheus via Webhooks (`WebhookEndpoint`).
-
-### 🏗 3. Headless Multi-Tenancy
-A single Morpheus backend deployment natively powers wholesale B2B channels, mobile apps, and B2C retail storefronts simultaneously via the `StoreChannel` scoping system.
-
-### 🛡 4. Immutable Event Sourcing
-Currency is handled safely via `MoneyField`. Order statuses transition strictly via Finite State Machines (`django-fsm`). Every financial transition generates an immutable `OrderEvent` for perfect auditability.
-
-### 🚀 5. Event-Driven Redis Caching
-Aggressive Redis query caching with Smart Invalidation. When a product updates, the `MorpheusEvents.PRODUCT_UPDATED` hook automatically flushes only the relevant cached GraphQL edges.
+1. **Agent-readable surface.** A `/graphql/agent/` endpoint, signed agent receipts, structured `agent_metadata` on every product, and a Python SDK so any LLM can browse, propose, and check out without scraping.
+2. **Composability.** Everything beyond the bare engine is a plugin under `plugins/installed/`. Catalog, orders, payments, AI, functions runtime, importers, observability, environments, affiliates, marketplace — they're all swappable.
+3. **Event-sourced + outbox-driven.** Every state change emits a hook + writes to a transactional outbox shipped to NATS JetStream. Replayable, auditable, fanout-friendly.
 
 ---
 
-## 🛠 Tech Stack
+## What's inside
 
-- **Backend:** Python 3.12, Django 5+
-- **Database:** PostgreSQL (Supabase recommended)
-- **API:** Strawberry GraphQL + Django REST Framework (DRF)
-- **Caching & Workers:** Redis + Celery
-- **Payments:** Stripe natively integrated
+### Engine (the small core)
+| Module | Role |
+|---|---|
+| [`core/`](core/) | hooks, models, tasks (HMAC-signed webhooks, NATS outbox), Celery, observability bootstrap |
+| [`api/`](api/) | GraphQL view (depth/alias guarded, `PermissionDenied` extension), REST viewsets, agent-only endpoint, rate limiter, type hints |
+| [`plugins/`](plugins/) | plugin base class + registry with **topological-sort activation** |
+| [`themes/`](themes/) | theme loader / context |
+| [`morph/`](morph/) | Django settings, ASGI/WSGI, Celery |
+
+### First-party plugins
+| Plugin | What it does |
+|---|---|
+| [`catalog`](plugins/installed/catalog/) | Products, variants, categories, collections, attributes, vendors, reviews, **`agent_metadata` on every Product** |
+| [`orders`](plugins/installed/orders/) | Cart → Order FSM, fulfillments, refunds, immutable `OrderEvent` log |
+| [`customers`](plugins/installed/customers/) | Custom user + addresses |
+| [`payments`](plugins/installed/payments/) | Stripe-first; provider façade for adding more |
+| [`inventory`](plugins/installed/inventory/) | Stock movements, low/out-of-stock hooks |
+| [`marketing`](plugins/installed/marketing/) | Coupons, campaigns |
+| [`analytics`](plugins/installed/analytics/) | Funnel events |
+| [`ai_assistant`](plugins/installed/ai_assistant/) | **Agent intent state machine, signed receipts, ProductEmbedding + semantic search, dynamic pricing, customer memory** |
+| [`ai_content`](plugins/installed/ai_content/) | Generative product copy |
+| [`storefront`](plugins/installed/storefront/) | Public storefront views |
+| [`admin_dashboard`](plugins/installed/admin_dashboard/) | Merchant admin |
+| [`functions`](plugins/installed/functions/) | **Sandboxed merchant-defined functions** for cart totals, product pricing, shipping, validation. Capability-grant model |
+| [`importers`](plugins/installed/importers/) | **Idempotent migrators**: Shopify, WooCommerce. CLI: `manage.py morph_import shopify --shop=... --token=...` |
+| [`observability`](plugins/installed/observability/) | Per-merchant `MerchantMetric` rollups (hourly + daily), `ErrorEvent` log, Celery beat schedules, GraphQL series API |
+| [`environments`](plugins/installed/environments/) | **Dev / staging / production** with snapshots, promotion, rollback. Protected envs require `confirm=True` |
+| [`affiliates`](plugins/installed/affiliates/) | Programs, links (`/r/<code>`), click tracking, last-click attribution, payouts |
+| [`marketplace`](plugins/installed/marketplace/) | Vendor onboarding, **per-vendor order splitting** with commission, vendor payout accounts |
 
 ---
 
-## 🚀 Quick Start
+## Sprint status
 
-### 1. Installation
+| # | Theme | Status |
+|---|---|---|
+| 1 | Security + perf + ops baseline (HMAC webhooks, GraphQL auth guards, REST scoping, throttling, depth limits, indexes, gunicorn Dockerfile, CI) | ✅ |
+| 2 | **Agent SDK alpha** + signed receipts + intent state machine | ✅ |
+| 3 | **pgvector-aware semantic search** + auto-embed hooks + agent_metadata | ✅ |
+| 4 | **Functions runtime** (sandboxed cart/price/shipping logic) | ✅ |
+| 5 | **Importers plugin** (Shopify + WooCommerce + CLI) | ✅ |
+| 6 | **Observability plugin** (per-merchant metric rollups + error log) | ✅ |
+| 7 | **Environments plugin** (dev/staging/prod + snapshots + promotion) | ✅ |
+| 8 | **Affiliates plugin** (links, attribution, payouts) | ✅ |
+| 9 | **Marketplace plugin** (vendor onboarding, order splitting, payouts) | ✅ |
 
-Clone the repository and set up a virtual environment:
+**Tests: 47/47 passing.** Lint via [pyproject.toml](pyproject.toml) (ruff, mypy, bandit, coverage).
+
+---
+
+## Tech stack
+
+- **Backend:** Python 3.12, Django 6
+- **API:** Strawberry GraphQL + Django REST Framework
+- **Database:** PostgreSQL (Supabase-ready) with `pgvector` upgrade path; SQLite for dev
+- **Cache + queue:** Redis, Celery (with `time_limit`/`soft_time_limit`/`acks_late`)
+- **Event bus:** NATS JetStream (transactional outbox publisher)
+- **Observability:** OpenTelemetry → OTLP collector → Prometheus / Grafana / Loki
+- **Containers:** multi-stage Dockerfile with non-root gunicorn runtime, k8s manifests
+- **SDK:** [`services/sdk_python`](services/sdk_python/) — `pip install -e services/sdk_python`
+
+---
+
+## Agent SDK quick taste
+
+```python
+from morph_sdk import MorphAgentClient
+
+agent = MorphAgentClient(
+    base_url="https://store.example.com",
+    agent_token="<token>",
+    signing_secret="<agent.signing_secret>",
+)
+
+products = agent.search_products("blender under 80 USD")
+
+intent = agent.propose_intent(
+    kind="checkout",
+    summary="Buy the Vitamix Pro",
+    payload={"product_id": products[0]["id"], "quantity": 1},
+    estimated_amount=79.99,
+)
+# customer authorizes; platform completes the intent and signs the receipt
+
+for done in agent.list_my_intents(state="completed"):
+    receipt = agent.receipt_for(done)
+    if receipt and receipt.verify():
+        print("✅", receipt.intent_id, receipt.state)
+```
+
+---
+
+## Functions runtime quick taste
+
+```python
+from plugins.installed.functions.runtime import execute
+
+# Cart total: 10% off if subtotal > 100
+result = execute(
+    source="""
+def run(input):
+    sub = float(input["value"])
+    return sub * 0.9 if sub > 100 else sub
+""",
+    input={"value": "120.00", "currency": "USD"},
+    capabilities=["math", "money"],
+    timeout_ms=200,
+)
+print(result.output)  # 108.0
+```
+
+The runtime refuses imports, dunder access, builtins like `open`/`exec`/`__import__`, and times out on runaway code.
+
+---
+
+## Quick start
 
 ```bash
 git clone https://github.com/magnetoid/morpheus.git
 cd morpheus
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-```
 
-### 2. Configuration
-
-Create a `.env` file in the root directory and configure your secrets:
-
-```env
-SECRET_KEY=your_secure_secret_key
-DEBUG=True
-DATABASE_URL=postgres://user:pass@localhost:5432/morpheus
-REDIS_URL=redis://localhost:6379/0
-
-# AI Provider Settings
-AI_PROVIDER=openai
-OPENAI_API_KEY=sk-your-key
-
-# Payments
-STRIPE_SECRET_KEY=sk_test_...
-```
-
-### 3. Migrate & Run
-
-```bash
-python manage.py makemigrations
+cp .env.example .env       # set SECRET_KEY, DATABASE_URL, REDIS_URL, …
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
-```
 
-Start the Celery worker for background tasks and webhook dispatching:
-```bash
+# in another shell:
 celery -A morph worker -l info
+celery -A morph beat -l info       # for observability rollups
+```
+
+For the full stack (Postgres + Redis + NATS + OTel collector + Prometheus + Grafana + Vector):
+
+```bash
+docker compose up -d
+```
+
+### Importing an existing store
+
+```bash
+# Shopify
+python manage.py morph_import shopify \
+    --shop=my-shop --token=$SHOPIFY_TOKEN
+
+# WooCommerce
+python manage.py morph_import woocommerce \
+    --base-url=https://shop.example.com \
+    --consumer-key=$WC_KEY --consumer-secret=$WC_SECRET
+
+# Or from a JSON fixture for reproducible imports / tests
+python manage.py morph_import shopify --from-file=fixtures/shopify.json
 ```
 
 ---
 
-## 📖 Documentation
+## Security defaults (changed from the legacy template)
 
-- **[Rules of the Platform](RULES.md)**: The 11 immutable laws of developing on Morpheus. Read this before submitting a PR.
-- **[Architecture & Vision](ARCHITECTURE.md)**: Deep dive into the system design, plugin lifecycle, and data flow.
-
----
-
-## 🤝 Contributing
-
-We are building the future of commerce. If you believe that open-source, developer-owned, agent-native platforms will replace the walled gardens of today, we want your help. 
-
-Please read `RULES.md` thoroughly before opening a Pull Request.
+- `DEBUG=False` by default; `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS` are required in prod
+- DRF default permission is `IsAuthenticated`; storefront catalog opts in to `AllowAny`
+- All webhooks ship with `X-Morpheus-Signature: sha256=<hmac>` — verifier in [`core/tasks.py`](core/tasks.py)
+- GraphQL has depth/alias caps + `PermissionDenied` extension that emits `code: PERMISSION_DENIED`
+- `RateLimitMiddleware` wired on `/graphql` and `/v1/`
+- `IGNORE_EXCEPTIONS` on Redis cache — a Redis blip can't 500 the whole site
+- Anti-pattern audit done: no broad `except Exception` left in the engine without `exc_info=True` + a documented reason
 
 ---
 
-## 📄 License
+## Observability
 
-Morpheus is open-source software licensed under the MIT License.
+| Surface | What you get |
+|---|---|
+| `/healthz` | Liveness |
+| `/readyz` | DB + cache reachable |
+| OTel | DjangoInstrumentor + RequestsInstrumentor + Psycopg2Instrumentor + RedisInstrumentor + CeleryInstrumentor |
+| `MerchantMetric` | Per-channel hourly/daily rollups of `orders_placed`, `orders_paid`, `product_views`, `agent_intents_completed`, … |
+| GraphQL `metricSeries(metric, granularity, hours)` | Time-series for the dashboard |
+
+Beat schedule registered automatically by the [observability plugin](plugins/installed/observability/plugin.py).
+
+---
+
+## Documentation
+
+- [`RULES.md`](RULES.md) — the platform's 11 laws. Read before opening a PR.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — system design, plugin lifecycle, data flow.
+- [`AI_VISION.md`](AI_VISION.md) — the agent-first thesis and roadmap.
+
+---
+
+## Contributing
+
+PRs welcome. The bar:
+
+1. New behavior comes with tests. The whole suite is fast — keep it that way.
+2. Don't add a top-level Django app for a new domain — make it a plugin.
+3. Don't catch broad `Exception` without `exc_info=True` + a one-line comment explaining why.
+4. Honor the security defaults in [`morph/settings.py`](morph/settings.py).
+
+---
+
+## License
+
+MIT. Build whatever you want with it.
