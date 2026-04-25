@@ -47,7 +47,10 @@ def embed(text: str) -> list[float]:
     if provider == 'openai' and getattr(settings, 'OPENAI_API_KEY', ''):
         try:
             from openai import OpenAI
-            client = OpenAI(api_key=settings.OPENAI_API_KEY)
+            from plugins.registry import plugin_registry
+            ai_plugin = plugin_registry.get_plugin('ai_assistant')
+            api_key = ai_plugin.get_config_value('openai_api_key') or settings.OPENAI_API_KEY
+            client = OpenAI(api_key=api_key)
             resp = client.embeddings.create(model=model, input=text)
             return list(resp.data[0].embedding)
         except Exception as e:  # noqa: BLE001 — fall back to deterministic hash, log warning

@@ -106,6 +106,16 @@ class AIAssistantPlugin(MorpheusPlugin):
                     "default": "openai",
                     "title": "LLM Provider",
                 },
+                "openai_api_key": {
+                    "type": "string",
+                    "title": "OpenAI API Key",
+                    "description": "Leave blank to use environment variables."
+                },
+                "anthropic_api_key": {
+                    "type": "string",
+                    "title": "Anthropic API Key",
+                    "description": "Leave blank to use environment variables."
+                },
                 "enable_intent_engine": {"type": "boolean", "default": True},
                 "enable_semantic_search": {"type": "boolean", "default": True},
                 "enable_dynamic_pricing": {"type": "boolean", "default": False},

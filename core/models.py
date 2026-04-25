@@ -22,6 +22,14 @@ class StoreSettings(models.Model):
     social_links = models.JSONField(default=dict)
     meta_title = models.CharField(max_length=200, blank=True)
     meta_description = models.TextField(blank=True)
+    
+    # Custom SMTP Overrides
+    smtp_host = models.CharField(max_length=200, blank=True, help_text="e.g. smtp.resend.com")
+    smtp_port = models.IntegerField(default=587)
+    smtp_user = models.CharField(max_length=200, blank=True)
+    smtp_password = models.CharField(max_length=200, blank=True)
+    default_from_email = models.CharField(max_length=200, blank=True, help_text="e.g. noreply@dotbooks.shop")
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

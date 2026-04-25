@@ -55,7 +55,10 @@ class LLMGateway(ABC):
 class OpenAIGateway(LLMGateway):
     def __init__(self):
         import openai
-        self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+        from plugins.registry import plugin_registry
+        ai_plugin = plugin_registry.get_plugin('ai_assistant')
+        api_key = ai_plugin.get_config_value('openai_api_key') or settings.OPENAI_API_KEY
+        self.client = openai.OpenAI(api_key=api_key)
         self.model = settings.AI_MODEL
         self.embed_model = settings.AI_EMBEDDING_MODEL
 
@@ -105,7 +108,10 @@ class OpenAIGateway(LLMGateway):
 class AnthropicGateway(LLMGateway):
     def __init__(self):
         import anthropic
-        self.client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        from plugins.registry import plugin_registry
+        ai_plugin = plugin_registry.get_plugin('ai_assistant')
+        api_key = ai_plugin.get_config_value('anthropic_api_key') or settings.ANTHROPIC_API_KEY
+        self.client = anthropic.Anthropic(api_key=api_key)
         self.model = settings.AI_MODEL or 'claude-3-5-haiku-latest'
 
     def complete(self, prompt: str, system: str = '', temperature: float = 0.7,
