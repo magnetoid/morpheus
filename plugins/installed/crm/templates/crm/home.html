@@ -1,0 +1,51 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}CRM · Morpheus admin{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">CRM</h1>
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Open leads</p>
+    <p class="text-2xl font-semibold mt-1">{{ metrics.open_leads }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Open tasks</p>
+    <p class="text-2xl font-semibold mt-1">{{ metrics.open_tasks }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Overdue</p>
+    <p class="text-2xl font-semibold mt-1" style="{% if metrics.overdue_tasks %}color:var(--danger);{% endif %}">
+      {{ metrics.overdue_tasks }}
+    </p>
+  </div>
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Open deals</p>
+    <p class="text-2xl font-semibold mt-1">{{ metrics.open_deals }}</p>
+  </div>
+</div>
+
+<h2 class="text-lg font-semibold mb-2">Recent activity</h2>
+<div class="card">
+  <table class="morph-table">
+    <thead>
+      <tr><th>When</th><th>Kind</th><th>Subject</th><th>Summary</th><th>Actor</th></tr>
+    </thead>
+    <tbody>
+    {% for r in recent_interactions %}
+      <tr>
+        <td>{{ r.occurred_at|date:"M j H:i" }}</td>
+        <td><span class="pill pill-neutral">{{ r.kind }}</span></td>
+        <td>{{ r.subject_type.model }}</td>
+        <td>{{ r.summary|truncatechars:80 }}</td>
+        <td>{% if r.actor %}{{ r.actor.email }}{% else %}{{ r.actor_name }}{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" style="text-align:center; padding: 2rem; color: var(--text-muted);">
+        No interactions yet. They populate as customers register, place orders, or you log them.
+      </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -66,7 +66,11 @@ case "$MODE" in
     ;;
   beat)
     wait_for_db
-    exec celery -A morph beat -l "${CELERY_LOG_LEVEL:-info}"
+    # Schedule DB needs a writable path. The non-root `morpheus` user can't
+    # write to /app, so put it under /tmp (or override via CELERY_BEAT_SCHEDULE_FILE).
+    SCHEDULE_FILE="${CELERY_BEAT_SCHEDULE_FILE:-/tmp/celerybeat-schedule}"
+    exec celery -A morph beat -l "${CELERY_LOG_LEVEL:-info}" \
+        --schedule "$SCHEDULE_FILE"
     ;;
   shell)
     wait_for_db
