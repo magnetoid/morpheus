@@ -46,6 +46,7 @@ MORPHEUS_DEFAULT_PLUGINS = [
     'plugins.installed.affiliates',
     'plugins.installed.marketplace',
     'plugins.installed.cloudflare',
+    'plugins.installed.seo',
 ]
 
 # ── Extra plugins installed by merchant via .env ───────────────────────────────
@@ -118,6 +119,7 @@ MIDDLEWARE = [
     'api.permissions.AgentAuthMiddleware',
     'api.rate_limit.RateLimitMiddleware',
     'plugins.installed.environments.middleware.EnvironmentMiddleware',
+    'plugins.installed.seo.middleware.SeoRedirectMiddleware',
 ]
 
 ROOT_URLCONF = 'morph.urls'
