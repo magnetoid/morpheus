@@ -50,6 +50,16 @@ COPY --chown=morpheus:morpheus . /app
 # Ensure the entrypoint is executable inside the image even if the host bit was lost.
 RUN chmod +x /app/scripts/docker-entrypoint.sh
 
+# Bake collected static into the image so admin + dashboard CSS/JS exist
+# even when the staticfiles volume is empty/unwritable. SECRET_KEY/DB are
+# not needed for collectstatic; pass placeholders to satisfy settings.py.
+RUN SECRET_KEY=build-only \
+    ALLOWED_HOSTS=localhost \
+    CORS_ALLOWED_ORIGINS=http://localhost \
+    DATABASE_URL=sqlite:///:memory: \
+    DEBUG=False \
+    python manage.py collectstatic --noinput
+
 USER morpheus
 EXPOSE 8000
 

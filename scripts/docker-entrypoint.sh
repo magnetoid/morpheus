@@ -43,8 +43,13 @@ run_migrations() {
 }
 
 collect_static() {
-  echo "[entrypoint] Collecting static files…"
-  python manage.py collectstatic --noinput || true
+  # Static is baked into the image at build time (see Dockerfile). This
+  # function exists for back-compat callers but is a no-op in the standard
+  # build. Set FORCE_COLLECTSTATIC=1 to override.
+  if [ "${FORCE_COLLECTSTATIC:-0}" = "1" ]; then
+    echo "[entrypoint] Collecting static files (forced)…"
+    python manage.py collectstatic --noinput || true
+  fi
 }
 
 case "$MODE" in

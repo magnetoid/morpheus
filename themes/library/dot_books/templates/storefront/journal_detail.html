@@ -1,0 +1,22 @@
+{% extends "storefront/base.html" %}
+{% block title %}{{ entry.title }} — Journal — dot books{% endblock %}
+
+{% block content %}
+<article style="padding: 4rem 0 5rem;">
+  <div class="wrap" style="max-width: 640px;">
+    <p class="meta" style="margin-bottom: 1.25rem;">
+      <a href="/journal/" style="color: var(--muted);">Journal</a>
+    </p>
+    <p class="meta">{{ entry.date_label }}</p>
+    <h1 class="display display-l" style="margin: 1rem 0 1.5rem;">
+      {{ entry.title }}<span class="text-accent">.</span>
+    </h1>
+    <div style="font-family: var(--serif); font-size: 1.1rem; line-height: 1.7; color: var(--ink-2);">
+      <p>{{ entry.body }}</p>
+    </div>
+
+    <hr class="rule" style="margin: 3rem 0;">
+    <a href="/journal/" class="btn-link">All entries</a>
+  </div>
+</article>
+{% endblock %}

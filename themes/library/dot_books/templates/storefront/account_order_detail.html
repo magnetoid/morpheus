@@ -1,0 +1,42 @@
+{% extends "storefront/base.html" %}
+{% block title %}Order #{{ order.order_number }} — dot books{% endblock %}
+
+{% block content %}
+<section style="padding: 4rem 0 5rem;">
+  <div class="wrap" style="max-width: 720px;">
+    <p class="meta" style="margin-bottom: 1rem;">
+      <a href="/account/" style="color: var(--muted);">Account</a>
+      <span style="margin: 0 0.5rem;">/</span>
+      <a href="/account/orders/" style="color: var(--muted);">Orders</a>
+      <span style="margin: 0 0.5rem;">/</span>
+      #{{ order.order_number }}
+    </p>
+    <h1 class="display display-l" style="margin: .5rem 0 1rem;">Order #{{ order.order_number }}<span class="text-accent">.</span></h1>
+    <p class="lede" style="margin-bottom: 2rem;">
+      Placed {{ order.created_at|date:"F j, Y" }} · status: <strong>{{ order.state }}</strong>
+    </p>
+
+    <div style="border: 1px solid var(--rule); border-radius: 6px; padding: 1.5rem;">
+      <h2 class="eyebrow" style="margin-bottom: 1rem;">Items</h2>
+      {% for item in order.items.all %}
+      <div style="display: flex; justify-content: space-between; padding: .75rem 0; border-bottom: 1px solid var(--rule);">
+        <div>
+          <p style="font-family: var(--serif); font-size: 1.05rem;">
+            {% if item.product %}{{ item.product.name }}{% else %}{{ item.product_name }}{% endif %}
+          </p>
+          <p class="meta">{{ item.quantity }} × {{ item.unit_price }}</p>
+        </div>
+        <div>
+          <p style="font-family: var(--serif); font-weight: 600;">{{ item.total_price }}</p>
+        </div>
+      </div>
+      {% endfor %}
+
+      <div style="display:flex; justify-content: space-between; padding-top: 1rem; margin-top: .5rem;">
+        <p style="font-family: var(--serif); font-size: 1.15rem;">Total</p>
+        <p style="font-family: var(--serif); font-size: 1.5rem; font-weight: 600;">{{ order.total }}</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
