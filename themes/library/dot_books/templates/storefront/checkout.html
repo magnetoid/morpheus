@@ -1,0 +1,65 @@
+{% extends "storefront/base.html" %}
+{% block title %}Checkout — dot books{% endblock %}
+
+{% block content %}
+<section style="padding: 3rem 0 5rem;">
+  <div class="wrap">
+    <p class="eyebrow">Checkout</p>
+    <h1 class="display display-l" style="margin: 1rem 0 2.5rem;">A few details, then off to you<span class="text-accent">.</span></h1>
+
+    <form method="post" style="display:grid; gap: 3rem; grid-template-columns: 1fr;" class="checkout-grid">
+      {% csrf_token %}
+      <div class="stack-6">
+        <fieldset style="border: 0; padding: 0; margin: 0;">
+          <legend class="eyebrow" style="margin-bottom: 1rem;">Contact</legend>
+          <div class="stack-3">
+            <input type="email" name="email" placeholder="you@example.com" required class="ck-input">
+          </div>
+        </fieldset>
+
+        <fieldset style="border: 0; padding: 0; margin: 0;">
+          <legend class="eyebrow" style="margin-bottom: 1rem;">Shipping</legend>
+          <div style="display:grid; gap: 0.75rem; grid-template-columns: 1fr 1fr;">
+            <input name="first_name" placeholder="First name" class="ck-input">
+            <input name="last_name" placeholder="Last name" class="ck-input">
+          </div>
+          <input name="address1" placeholder="Address" style="margin-top: 0.75rem;" class="ck-input">
+          <input name="address2" placeholder="Apt, suite, etc. (optional)" style="margin-top: 0.75rem;" class="ck-input">
+          <div style="display:grid; gap: 0.75rem; grid-template-columns: 2fr 1fr 1fr; margin-top: 0.75rem;">
+            <input name="city" placeholder="City" class="ck-input">
+            <input name="state" placeholder="State" class="ck-input">
+            <input name="zip" placeholder="ZIP" class="ck-input">
+          </div>
+        </fieldset>
+
+        <fieldset style="border: 0; padding: 0; margin: 0;">
+          <legend class="eyebrow" style="margin-bottom: 1rem;">Payment</legend>
+          <p class="meta" style="margin-bottom: 1rem;">Card details are tokenized by Stripe. We never see your number.</p>
+          <input placeholder="Card number" class="ck-input">
+          <div style="display:grid; gap: 0.75rem; grid-template-columns: 1fr 1fr; margin-top: 0.75rem;">
+            <input placeholder="MM / YY" class="ck-input">
+            <input placeholder="CVC" class="ck-input">
+          </div>
+        </fieldset>
+
+        <button type="submit" class="btn btn-primary" style="height: 52px; padding: 0 2rem; align-self: flex-start;">Place order</button>
+      </div>
+
+      <aside style="border: 1px solid var(--rule); border-radius: 4px; padding: 2rem; background: var(--paper-2);">
+        <p class="eyebrow">Your order</p>
+        <p class="meta" style="margin-top: 1rem;">Cart contents will summarize here once we wire the GraphQL.</p>
+        <hr class="rule" style="margin: 1.5rem 0;">
+        <p style="font-family: var(--serif); font-style: italic; line-height: 1.55; color: var(--muted);">
+          "Thank you for buying small. Each book ships in compostable mailer with a hand-stamped invoice."
+        </p>
+      </aside>
+    </form>
+  </div>
+</section>
+
+<style>
+.ck-input { width: 100%; height: 48px; padding: 0 1rem; border: 1px solid var(--rule); border-radius: 999px; background: var(--paper); font-family: var(--sans); font-size: 0.95rem; }
+.ck-input:focus { outline: none; border-color: var(--ink); }
+@media (min-width: 900px) { .checkout-grid { grid-template-columns: 1.4fr 0.6fr !important; gap: 4rem !important; align-items: start; } }
+</style>
+{% endblock %}

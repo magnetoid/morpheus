@@ -24,7 +24,7 @@ if not DEBUG and ALLOWED_HOSTS == ['localhost', '127.0.0.1']:
 # ── Plugin & Theme directories ─────────────────────────────────────────────────
 MORPHEUS_PLUGINS_DIR = BASE_DIR / 'plugins' / 'installed'
 MORPHEUS_THEMES_DIR = BASE_DIR / 'themes' / 'library'
-MORPHEUS_ACTIVE_THEME = config('MORPHEUS_ACTIVE_THEME', default='aurora')
+MORPHEUS_ACTIVE_THEME = config('MORPHEUS_ACTIVE_THEME', default='dot_books')
 
 # ── Default plugins (always in INSTALLED_APPS — they have models) ──────────────
 MORPHEUS_DEFAULT_PLUGINS = [

@@ -1,0 +1,195 @@
+{% extends "storefront/base.html" %}
+{% block title %}dot books. — a quieter shelf for louder books{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<section style="padding-top: 3rem; padding-bottom: 3rem;">
+  <div class="wrap" style="display: grid; grid-template-columns: 1fr; gap: 3rem; align-items: end;">
+    <div>
+      <p class="eyebrow">Issue 04 — April</p>
+      <h1 class="display display-xl" style="margin: 1rem 0 1.5rem;">
+        a quieter shelf<br>
+        for <em style="font-style:italic; color: var(--accent);">louder</em> books<span class="text-accent">.</span>
+      </h1>
+      <p class="lede" style="margin-bottom: 2rem;">
+        Hand-picked titles from independent presses around the world. No bestseller charts, no algorithmic shuffling — just the books we want to put in your hands.
+      </p>
+      <div style="display:flex; gap: 0.75rem; flex-wrap: wrap;">
+        <a href="/products/" class="btn btn-primary">Browse the shelf</a>
+        <a href="#editors-pick" class="btn btn-ghost">Editor's pick</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- Editor's pick -->
+<section id="editors-pick">
+  <div class="wrap" style="display: grid; grid-template-columns: 1fr; gap: 3rem; align-items: center;">
+    <div style="display:grid; gap:3rem; grid-template-columns: 1fr; align-items:center;" class="picks-grid">
+      <div>
+        <p class="eyebrow">Editor's pick</p>
+        <h2 class="display display-l" style="margin: 1rem 0;">
+          The book that<br>moved this month<span class="text-accent">.</span>
+        </h2>
+        <p class="lede" style="margin-bottom: 2rem;">
+          Each month we choose one title that, in our minds, says something the rest of the shelf hasn't yet found a way to say. April's pick is below.
+        </p>
+        {% with featured_products|first as pick %}
+        {% if pick %}
+        <div class="stack-3">
+          <p style="font-family: var(--serif); font-size: 1.5rem; line-height: 1.15;"><em>{{ pick.name }}</em></p>
+          <p class="meta">{{ pick.category.name|default:"" }}</p>
+          <p style="margin-top: 1rem; max-width: 50ch; color: var(--ink-2); line-height: 1.6;">{{ pick.short_description|default:""|truncatewords:36 }}</p>
+          <a href="/products/{{ pick.slug }}/" class="btn-link" style="margin-top:1rem;">Read more</a>
+        </div>
+        {% endif %}
+        {% endwith %}
+      </div>
+
+      <div>
+        {% with featured_products|first as pick %}
+        {% if pick %}
+        <a href="/products/{{ pick.slug }}/" class="book" style="max-width: 380px; margin: 0 auto;">
+          <div class="cover-wrap" style="aspect-ratio: 2/3; box-shadow: 0 30px 60px -20px rgba(14,14,14,0.45);">
+            {% if pick.primary_image %}
+              <img src="{{ pick.primary_image.image.url }}" alt="{{ pick.name }}">
+            {% else %}
+              <div class="placeholder">{{ pick.name }}</div>
+            {% endif %}
+            <span class="ribbon">Editor's pick</span>
+          </div>
+        </a>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+@media (min-width: 900px) {
+  .picks-grid { grid-template-columns: 1.1fr 0.9fr !important; gap: 5rem !important; }
+}
+</style>
+
+<hr class="rule">
+
+<!-- Curated row 1 -->
+<section>
+  <div class="wrap">
+    <div style="display:flex; align-items:end; justify-content:space-between; margin-bottom: 2.5rem; gap: 1rem;">
+      <div>
+        <p class="eyebrow">Now on the shelf</p>
+        <h2 class="display display-m" style="margin-top: 0.6rem;">New &amp; notable<span class="text-accent">.</span></h2>
+      </div>
+      <a href="/products/?featured=true" class="btn-link">See all</a>
+    </div>
+    <div class="grid-books">
+      {% for product in featured_products %}
+      <a href="/products/{{ product.slug }}/" class="book">
+        <div class="cover-wrap">
+          {% if product.primary_image %}
+            <img src="{{ product.primary_image.image.url }}" alt="{{ product.name }}">
+          {% else %}
+            <div class="placeholder">{{ product.name|truncatewords:3 }}</div>
+          {% endif %}
+          {% if product.is_on_sale %}<span class="ribbon">{{ product.discount_percentage }}% off</span>{% endif %}
+        </div>
+        <div>
+          <p class="title">{{ product.name }}</p>
+          <p class="author">{{ product.category.name|default:"Independent press" }}</p>
+          <p class="price">
+            {{ product.price }}
+            {% if product.is_on_sale %}<span class="compare">{{ product.compare_at_price }}</span>{% endif %}
+          </p>
+        </div>
+      </a>
+      {% empty %}
+      <div style="grid-column: 1 / -1; padding: 4rem 2rem; text-align: center; border: 1px dashed var(--rule); border-radius: 4px;">
+        <p class="lede" style="margin: 0 auto;">The shelf is being restocked. Check back tomorrow.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Manifesto block -->
+<section style="background: var(--paper-2); padding: 6rem 0;">
+  <div class="wrap" style="text-align: center;">
+    <p class="eyebrow">A note from us</p>
+    <h2 class="display display-l" style="margin: 1.5rem auto; max-width: 22ch;">
+      We don't sell books that need a marketing budget to be worth reading<span class="text-accent">.</span>
+    </h2>
+    <p class="lede" style="margin: 0 auto;">
+      Every title here was read by at least one of us before it made it onto the shelf. That's both a constraint and a promise. If we put it in front of you, it earned the spot.
+    </p>
+    <a href="/about/" class="btn-link" style="margin-top: 2rem; justify-content: center; display: inline-flex;">Read the manifesto</a>
+  </div>
+</section>
+
+<!-- Curated row 2 -->
+<section>
+  <div class="wrap">
+    <div style="display:flex; align-items:end; justify-content:space-between; margin-bottom: 2.5rem; gap: 1rem;">
+      <div>
+        <p class="eyebrow">By season</p>
+        <h2 class="display display-m" style="margin-top: 0.6rem;">Reading the spring<span class="text-accent">.</span></h2>
+      </div>
+      <a href="/products/" class="btn-link">See all</a>
+    </div>
+    <div class="grid-books">
+      {% for product in seasonal_products|default:featured_products %}
+      <a href="/products/{{ product.slug }}/" class="book">
+        <div class="cover-wrap">
+          {% if product.primary_image %}
+            <img src="{{ product.primary_image.image.url }}" alt="{{ product.name }}">
+          {% else %}
+            <div class="placeholder">{{ product.name|truncatewords:3 }}</div>
+          {% endif %}
+        </div>
+        <div>
+          <p class="title">{{ product.name }}</p>
+          <p class="author">{{ product.category.name|default:"Independent press" }}</p>
+          <p class="price">{{ product.price }}</p>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- Journal teaser -->
+<section class="tight">
+  <div class="wrap">
+    <div style="display:grid; grid-template-columns: 1fr; gap: 2rem; align-items: end;">
+      <div>
+        <p class="eyebrow">From the journal</p>
+        <h2 class="display display-m" style="margin-top: 0.6rem;">On rereading the shelf<span class="text-accent">.</span></h2>
+      </div>
+      <a href="/journal/" class="btn-link">All entries</a>
+    </div>
+
+    <div style="display:grid; gap: 2rem; grid-template-columns: 1fr; margin-top: 2rem;" class="journal-grid">
+      {% for i in '123' %}
+      <article style="border-top: 1px solid var(--rule); padding-top: 1.25rem;">
+        <p class="meta">April · 4 min read</p>
+        <h3 style="font-family: var(--serif); font-size: 1.6rem; font-weight: 500; line-height: 1.2; margin: 0.6rem 0;">
+          <a href="/journal/">{% if forloop.counter == 1 %}A short note on patience and the long sentence{% elif forloop.counter == 2 %}Why we don't carry books we haven't read{% else %}The case for the small press, made in numbers{% endif %}</a>
+        </h3>
+        <p style="color: var(--ink-2); line-height: 1.55;">{% if forloop.counter == 1 %}On Cusk, on Sebald, on the way a long paragraph teaches you how to wait. {% elif forloop.counter == 2 %}A diary of how the shelf gets curated, and why it's a small one on purpose. {% else %}Three years of receipts, and what they say about who's actually publishing the work that lasts. {% endif %}</p>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<style>
+@media (min-width: 900px) { .journal-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 2.5rem !important; } }
+</style>
+
+{% endblock %}
