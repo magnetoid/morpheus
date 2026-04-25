@@ -30,3 +30,9 @@ class InventoryPlugin(MorpheusPlugin):
         # Release reservations on cancel.
         from plugins.installed.inventory.services import InventoryService
         InventoryService.release_reservation(order)
+
+    def contribute_agent_tools(self) -> list:
+        from plugins.installed.inventory.agent_tools import (
+            adjust_stock_tool, low_stock_report_tool,
+        )
+        return [low_stock_report_tool, adjust_stock_tool]

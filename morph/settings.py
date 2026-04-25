@@ -55,6 +55,7 @@ MORPHEUS_DEFAULT_PLUGINS = [
     'plugins.installed.seo',
     'plugins.installed.demo_data',
     'plugins.installed.advanced_ecommerce',
+    'plugins.installed.agent_core',
 ]
 
 # ── Extra plugins installed by merchant via .env ───────────────────────────────

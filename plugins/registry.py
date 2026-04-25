@@ -192,6 +192,16 @@ class PluginRegistry:
                 self._settings_panels[plugin.name] = panel
         except Exception as e:  # noqa: BLE001
             logger.warning('plugins: %s.contribute_settings_panel failed: %s', plugin.name, e, exc_info=True)
+        # Agent layer contributions — tools first so any agent that depends
+        # on a sibling tool finds it already registered.
+        try:
+            from core.agents.registry import agent_registry
+            for tool in plugin.contribute_agent_tools() or []:
+                agent_registry.register_tool(tool, plugin=plugin.name)
+            for agent in plugin.contribute_agents() or []:
+                agent_registry.register_agent(agent, plugin=plugin.name)
+        except Exception as e:  # noqa: BLE001
+            logger.warning('plugins: %s agent contributions failed: %s', plugin.name, e, exc_info=True)
         # Sort blocks and pages once per activation so render-time stays cheap.
         self._storefront_blocks.sort(key=lambda b: (b.slot, b.priority, b.plugin))
         self._dashboard_pages.sort(key=lambda p: (p.section, p.order, p.label))
@@ -200,6 +210,11 @@ class PluginRegistry:
         self._storefront_blocks = [b for b in self._storefront_blocks if b.plugin != plugin_name]
         self._dashboard_pages = [p for p in self._dashboard_pages if p.plugin != plugin_name]
         self._settings_panels.pop(plugin_name, None)
+        try:
+            from core.agents.registry import agent_registry
+            agent_registry.drop_plugin(plugin_name)
+        except Exception as e:  # noqa: BLE001
+            logger.warning('plugins: %s agent drop failed: %s', plugin_name, e, exc_info=True)
 
     def storefront_blocks_for(self, slot: str) -> list:
         return [b for b in self._storefront_blocks if b.slot == slot]

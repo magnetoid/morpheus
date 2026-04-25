@@ -1,0 +1,119 @@
+"""
+agent_core — the platform agent layer plugin.
+
+Wires the kernel `core.agents` module into Django: persistent runs, GraphQL,
+streaming chat endpoint, dashboard, and four built-in agents.
+
+Other plugins extend the agent layer through:
+
+    class FooPlugin(MorpheusPlugin):
+        def contribute_agent_tools(self):
+            return [my_tool]
+        def contribute_agents(self):
+            return [MyAgent()]
+
+…which `agent_core` does not need to know about — the registry collects
+contributions from every active plugin.
+"""
+from __future__ import annotations
+
+import logging
+
+from plugins.base import MorpheusPlugin
+from plugins.contributions import DashboardPage, SettingsPanel, StorefrontBlock
+
+logger = logging.getLogger('morpheus.agent_core')
+
+
+class AgentCorePlugin(MorpheusPlugin):
+    name = 'agent_core'
+    label = 'Agent Core'
+    version = '1.0.0'
+    description = (
+        'Kernel agent layer: runtime, registry, persistent runs, streaming '
+        'chat, and four built-in agents (Concierge, Merchant Ops, Pricing, '
+        'Content Writer). Contributes a chat widget to the storefront and '
+        'a console + runs dashboard to the admin.'
+    )
+    has_models = True
+    requires = ['catalog', 'orders']
+
+    def ready(self) -> None:
+        self.register_graphql_extension('plugins.installed.agent_core.graphql.queries')
+        self.register_graphql_extension('plugins.installed.agent_core.graphql.mutations')
+        self.register_urls(
+            'plugins.installed.agent_core.urls_api',
+            prefix='api/',
+            namespace='agent_core_api',
+        )
+        self.register_urls(
+            'plugins.installed.agent_core.urls_dashboard',
+            prefix='dashboard/agents/',
+            namespace='agent_core_dash',
+        )
+
+    # ── Contribution surfaces ─────────────────────────────────────────────────
+
+    def contribute_agent_tools(self) -> list:
+        from plugins.installed.agent_core.tools import all_builtin_tools
+        return all_builtin_tools()
+
+    def contribute_agents(self) -> list:
+        from plugins.installed.agent_core.agents import all_builtin_agents
+        return all_builtin_agents()
+
+    def contribute_storefront_blocks(self) -> list:
+        return [
+            StorefrontBlock(
+                slot='global_below_body',
+                template='agent_core/blocks/concierge_widget.html',
+                priority=80,
+            ),
+        ]
+
+    def contribute_dashboard_pages(self) -> list:
+        return [
+            DashboardPage(
+                label='Agents',
+                slug='runs',
+                view='plugins.installed.agent_core.views.runs_dashboard_view',
+                icon='sparkles',
+                section='ai',
+                order=10,
+            ),
+            DashboardPage(
+                label='Ops console',
+                slug='console',
+                view='plugins.installed.agent_core.views.merchant_ops_chat_view',
+                icon='terminal',
+                section='ai',
+                order=20,
+            ),
+        ]
+
+    def contribute_settings_panel(self) -> SettingsPanel:
+        return SettingsPanel(
+            label='Agents',
+            description='Configure the agent runtime and built-in agents.',
+            schema=self.get_config_schema(),
+        )
+
+    def get_config_schema(self) -> dict:
+        return {
+            'type': 'object',
+            'properties': {
+                'enable_concierge_widget': {
+                    'type': 'boolean', 'default': True,
+                    'title': 'Show storefront concierge widget',
+                },
+                'concierge_greeting': {
+                    'type': 'string',
+                    'default': 'Hi — I\'m the concierge. What kind of book are you in the mood for?',
+                    'title': 'Concierge greeting',
+                },
+                'merchant_ops_enabled': {
+                    'type': 'boolean', 'default': True,
+                    'title': 'Enable Merchant Ops console',
+                },
+            },
+        }
