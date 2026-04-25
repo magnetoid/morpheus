@@ -45,6 +45,7 @@ MORPHEUS_DEFAULT_PLUGINS = [
     'plugins.installed.environments',
     'plugins.installed.affiliates',
     'plugins.installed.marketplace',
+    'plugins.installed.cloudflare',
 ]
 
 # ── Extra plugins installed by merchant via .env ───────────────────────────────
