@@ -189,11 +189,15 @@ if REPLICA_DB_URL:
 
 DATABASE_ROUTERS = ['core.db_router.PrimaryReplicaRouter']
 
-# Supabase requires SSL on all PostgreSQL connections
+# Postgres SSL mode is operator-controlled. Defaults to 'require' so the
+# common Supabase / managed-PG case is safe. Set DATABASE_SSL_MODE=disable
+# (or 'prefer') for internal Docker Postgres without SSL certs. Honours the
+# `?sslmode=…` query string in DATABASE_URL when present.
+_DEFAULT_SSL_MODE = config('DATABASE_SSL_MODE', default='require')
 for db_name in DATABASES:
     if DATABASES[db_name].get('ENGINE') == 'django.db.backends.postgresql':
         DATABASES[db_name].setdefault('OPTIONS', {})
-        DATABASES[db_name]['OPTIONS']['sslmode'] = 'require'
+        DATABASES[db_name]['OPTIONS'].setdefault('sslmode', _DEFAULT_SSL_MODE)
 
 # ── Auth ───────────────────────────────────────────────────────────────────────
 AUTH_USER_MODEL = 'customers.Customer'
