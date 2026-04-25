@@ -1,28 +1,217 @@
-import strawberry
-from typing import Optional
-from plugins.installed.orders.graphql.types import CartType
-from core.graphql.types import ErrorType
+"""Cart + checkout mutations exposed by the orders plugin."""
+from __future__ import annotations
 
+from typing import Optional
+
+import strawberry
+
+from core.graphql.types import ErrorType
+from plugins.installed.orders.graphql.types import CartType
 from plugins.installed.orders.services import CartService
+
+
+# ── Inputs ─────────────────────────────────────────────────────────────────────
+
 
 @strawberry.input
 class AddToCartInput:
-    product_id: str = strawberry.field(description="UUID of the product")
-    quantity: int = strawberry.field(description="Quantity to add")
-    session_key: str = strawberry.field(description="Anonymous session key", default="")
+    product_id: str = strawberry.field(description='UUID of the product')
+    quantity: int = strawberry.field(description='Quantity to add')
+    variant_id: Optional[str] = strawberry.field(default=None, description='UUID of variant (optional)')
+    session_key: str = strawberry.field(default='', description='Anonymous session key')
+
+
+@strawberry.input
+class UpdateCartItemInput:
+    item_id: str
+    quantity: int
+
+
+@strawberry.input
+class RemoveCartItemInput:
+    item_id: str
+
+
+@strawberry.input
+class ApplyCouponInput:
+    cart_id: str
+    code: str
+
+
+@strawberry.input
+class AddressInput:
+    first_name: str = ''
+    last_name: str = ''
+    line1: str = ''
+    line2: str = ''
+    city: str = ''
+    state: str = ''
+    postal_code: str = ''
+    country: str = ''
+    phone: str = ''
+
+
+@strawberry.input
+class CompleteOrderInput:
+    cart_id: str
+    email: str
+    shipping_address: AddressInput
+    billing_address: Optional[AddressInput] = None
+
+
+# ── Payloads ───────────────────────────────────────────────────────────────────
+
 
 @strawberry.type
-class AddToCartPayload:
+class CartPayload:
     cart: Optional[CartType]
     errors: list[ErrorType]
 
+
+@strawberry.type
+class OrderPayload:
+    order_number: str = ''
+    payment_client_secret: str = ''
+    errors: list[ErrorType] = strawberry.field(default_factory=list)
+
+
+# ── Mutations ──────────────────────────────────────────────────────────────────
+
+
 @strawberry.type
 class OrdersMutationExtension:
-    @strawberry.mutation(description="Add an item to a cart. If cart doesn't exist, it will be created.")
-    def add_to_cart(self, input: AddToCartInput) -> AddToCartPayload:
+
+    @strawberry.mutation(description='Add an item to a cart (creates the cart if needed).')
+    def add_to_cart(self, info: strawberry.Info, input: AddToCartInput) -> CartPayload:
         try:
-            cart = CartService.get_or_create_cart(session_key=input.session_key)
-            CartService.add_item(cart=cart, product_id=input.product_id, quantity=input.quantity)
-            return AddToCartPayload(cart=cart, errors=[])
-        except Exception as e:
-            return AddToCartPayload(cart=None, errors=[ErrorType(code="ADD_TO_CART_ERROR", message=str(e))])
+            request = info.context.get('request') if isinstance(info.context, dict) else getattr(info.context, 'request', None)
+            customer = getattr(request, 'user', None) if request else None
+            customer = customer if (customer and customer.is_authenticated) else None
+            session_key = input.session_key or (
+                request.session.session_key if request and hasattr(request, 'session') else ''
+            )
+
+            cart = CartService.get_or_create_cart(session_key=session_key, customer=customer)
+            CartService.add_item(
+                cart=cart,
+                product_id=input.product_id,
+                quantity=max(1, input.quantity),
+                variant_id=input.variant_id,
+            )
+            if request is not None and hasattr(request, 'session') and not request.session.get('cart_id'):
+                request.session['cart_id'] = str(cart.id)
+            return CartPayload(cart=cart, errors=[])
+        except Exception as e:  # noqa: BLE001 — surface domain failure as ErrorType
+            return CartPayload(cart=None, errors=[ErrorType(code='ADD_TO_CART_ERROR', message=str(e))])
+
+    @strawberry.mutation(description='Update the quantity of a single line item.')
+    def update_cart_item(self, input: UpdateCartItemInput) -> CartPayload:
+        from plugins.installed.orders.models import CartItem
+
+        try:
+            item = CartItem.objects.select_related('cart').get(pk=input.item_id)
+            qty = max(0, int(input.quantity))
+            if qty == 0:
+                cart = item.cart
+                item.delete()
+            else:
+                item.quantity = qty
+                item.save(update_fields=['quantity'])
+                cart = item.cart
+            return CartPayload(cart=cart, errors=[])
+        except CartItem.DoesNotExist:
+            return CartPayload(cart=None, errors=[ErrorType(code='NOT_FOUND', message='Cart item not found.')])
+        except Exception as e:  # noqa: BLE001
+            return CartPayload(cart=None, errors=[ErrorType(code='UPDATE_ERROR', message=str(e))])
+
+    @strawberry.mutation(description='Remove a single line item from a cart.')
+    def remove_cart_item(self, input: RemoveCartItemInput) -> CartPayload:
+        from plugins.installed.orders.models import CartItem
+
+        try:
+            item = CartItem.objects.select_related('cart').get(pk=input.item_id)
+            cart = item.cart
+            item.delete()
+            return CartPayload(cart=cart, errors=[])
+        except CartItem.DoesNotExist:
+            return CartPayload(cart=None, errors=[ErrorType(code='NOT_FOUND', message='Cart item not found.')])
+
+    @strawberry.mutation(description='Apply a coupon code to a cart.')
+    def apply_coupon(self, input: ApplyCouponInput) -> CartPayload:
+        from plugins.installed.orders.models import Cart
+
+        try:
+            cart = Cart.objects.get(pk=input.cart_id)
+        except Cart.DoesNotExist:
+            return CartPayload(cart=None, errors=[ErrorType(code='NOT_FOUND', message='Cart not found.')])
+
+        try:
+            from plugins.installed.marketing.models import Coupon
+            coupon = Coupon.objects.filter(code__iexact=input.code, is_active=True).first()
+            if coupon is None:
+                return CartPayload(cart=cart, errors=[ErrorType(code='INVALID_COUPON', message='Coupon not found or expired.')])
+            cart.coupon = coupon
+            cart.save(update_fields=['coupon', 'updated_at'])
+        except ImportError:
+            pass  # marketing optional
+        except Exception:  # noqa: BLE001 — coupon model not yet migrated
+            pass
+        return CartPayload(cart=cart, errors=[])
+
+    @strawberry.mutation(description='Complete checkout: create the order, fire order.placed, return the Stripe client_secret.')
+    def complete_order(self, input: CompleteOrderInput) -> OrderPayload:
+        from django.db import transaction
+        from plugins.installed.orders.models import Cart
+        from plugins.installed.orders.services import OrderService
+
+        try:
+            cart = Cart.objects.prefetch_related(
+                'items', 'items__product', 'items__variant',
+            ).get(pk=input.cart_id)
+        except Cart.DoesNotExist:
+            return OrderPayload(errors=[ErrorType(code='NOT_FOUND', message='Cart not found.')])
+
+        if not cart.items.exists():
+            return OrderPayload(errors=[ErrorType(code='EMPTY_CART', message='Cart is empty.')])
+
+        if not input.email or '@' not in input.email:
+            return OrderPayload(errors=[ErrorType(code='INVALID_EMAIL', message='A valid email is required.')])
+
+        ship = _address_dict(input.shipping_address)
+        bill = _address_dict(input.billing_address) if input.billing_address else ship
+
+        try:
+            with transaction.atomic():
+                order = OrderService.create_from_cart(
+                    cart=cart, email=input.email,
+                    shipping_address=ship, billing_address=bill,
+                )
+            client_secret = ''
+            try:
+                from plugins.installed.payments.services.stripe import PaymentService
+                pi = PaymentService.create_payment_intent(order)
+                if pi.get('success'):
+                    client_secret = pi.get('client_secret') or ''
+            except Exception:  # noqa: BLE001 — order placed even if payment provider is offline
+                pass
+            return OrderPayload(
+                order_number=order.order_number,
+                payment_client_secret=client_secret,
+                errors=[],
+            )
+        except Exception as e:  # noqa: BLE001
+            return OrderPayload(errors=[ErrorType(code='CHECKOUT_FAILED', message=str(e)[:300])])
+
+
+def _address_dict(addr: AddressInput) -> dict:
+    return {
+        'first_name': addr.first_name or '',
+        'last_name':  addr.last_name or '',
+        'line1':       addr.line1 or '',
+        'line2':       addr.line2 or '',
+        'city':        addr.city or '',
+        'state':       addr.state or '',
+        'postal_code': addr.postal_code or '',
+        'country':     addr.country or '',
+        'phone':       addr.phone or '',
+    }

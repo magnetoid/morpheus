@@ -1,20 +1,36 @@
+from __future__ import annotations
+
+import logging
+
+from core.hooks import MorpheusEvents
 from plugins.base import MorpheusPlugin
+
+logger = logging.getLogger('morpheus.orders')
 
 
 class OrdersPlugin(MorpheusPlugin):
-    name = "orders"
-    label = "Orders"
-    version = "1.0.0"
-    description = "Cart, order lifecycle, fulfillment, and refunds."
+    name = 'orders'
+    label = 'Orders'
+    version = '1.0.0'
+    description = 'Cart, order lifecycle, fulfillment, refunds, transactional email.'
     has_models = True
-    requires = ["catalog", "customers"]
+    requires = ['catalog', 'customers']
 
-    def ready(self):
+    def ready(self) -> None:
         self.register_graphql_extension('plugins.installed.orders.graphql.queries')
         self.register_graphql_extension('plugins.installed.orders.graphql.mutations')
         self.register_hook('payment.captured', self.on_payment_captured, priority=10)
-        from plugins.installed.orders import signals  # noqa
+        self.register_hook(MorpheusEvents.ORDER_PLACED, self.on_order_placed, priority=15)
+        from plugins.installed.orders import signals  # noqa: F401 — register signals on import
 
     def on_payment_captured(self, payment, **kwargs):
         from plugins.installed.orders.services import OrderService
         OrderService.confirm_order(payment.order)
+
+    def on_order_placed(self, order, **kwargs):
+        """Send the customer their order-confirmation email."""
+        try:
+            from plugins.installed.orders.email import send_order_confirmation
+            send_order_confirmation(order)
+        except Exception as e:  # noqa: BLE001 — email never blocks order placement
+            logger.warning('orders: confirmation email failed for %s: %s', getattr(order, 'order_number', '?'), e, exc_info=True)
