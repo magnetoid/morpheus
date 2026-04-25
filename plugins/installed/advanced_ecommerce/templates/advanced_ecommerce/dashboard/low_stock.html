@@ -1,0 +1,44 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Low-stock alerts · Morpheus{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Low-stock alerts</h1>
+    <p class="text-sm text-[color:var(--text-muted)]">
+      Variants with available stock at or below {{ threshold }} units.
+      Adjust the cutoff in
+      <a href="/dashboard/apps/advanced_ecommerce/settings/" class="hover:underline">plugin settings</a>.
+    </p>
+  </div>
+
+  <div class="card overflow-hidden">
+    {% if rows %}
+    <table class="morph-table">
+      <thead>
+        <tr><th>Product</th><th>Variant</th><th>Warehouse</th><th class="text-right">On hand</th><th class="text-right">Available</th></tr>
+      </thead>
+      <tbody>
+        {% for sl in rows %}
+        <tr>
+          <td>{{ sl.variant.product.name }}</td>
+          <td class="text-[color:var(--text-muted)]">{{ sl.variant.name }}</td>
+          <td class="text-[color:var(--text-muted)]">{{ sl.warehouse.name }}</td>
+          <td class="text-right">{{ sl.quantity }}</td>
+          <td class="text-right font-medium">
+            {% if sl.is_out_of_stock %}<span class="pill pill-danger">0</span>
+            {% else %}{{ sl.available_quantity }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="card-padded text-center py-12">
+      <p class="font-medium">All clear<span style="color:#e63946;">.</span></p>
+      <p class="text-sm text-[color:var(--text-muted)] mt-1">No variants below the cutoff.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% load advanced_ecommerce %}
+{% if product %}
+{% low_stock_threshold as threshold %}
+{% product_total_stock product as stock %}
+{% if stock > 0 and stock|add:0 <= threshold %}
+<p style="margin: 0.5rem 0 0; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0.65rem; border-radius: 999px; background: var(--warn-bg, #ffeacc); color: var(--warn, #b86e00); font-size: 0.75rem; font-weight: 600;">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  Only {{ stock }} left
+</p>
+{% endif %}
+{% endif %}
