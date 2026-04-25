@@ -171,6 +171,78 @@ All extension calls go inside `ready()`. They take effect once per process.
 
 Calling any of these *outside* `ready()` raises a clear runtime error.
 
+### 5.1 Contribution surfaces
+
+Beyond `ready()`-time imperative registration, plugins can **declaratively
+contribute** features. The registry calls these methods after `ready()`
+and aggregates the results into platform-wide indexes — when a merchant
+**enables** the plugin in the dashboard, every contribution lights up at once.
+
+```python
+from plugins.contributions import StorefrontBlock, DashboardPage, SettingsPanel
+
+class AdvancedShopPlugin(MorpheusPlugin):
+    name = 'advanced_shop'
+    label = 'Advanced Shop'
+    version = '0.1.0'
+
+    def contribute_storefront_blocks(self) -> list:
+        return [
+            StorefrontBlock(
+                slot='home_below_grid',
+                template='advanced_shop/blocks/recently_viewed.html',
+                priority=10,
+            ),
+            StorefrontBlock(
+                slot='pdp_below_form',
+                template='advanced_shop/blocks/related_products.html',
+            ),
+        ]
+
+    def contribute_dashboard_pages(self) -> list:
+        # Routed at /dashboard/apps/advanced_shop/<slug>/.
+        return [
+            DashboardPage(
+                label='Bulk price edit',
+                slug='bulk-price',
+                view='plugins.installed.advanced_shop.views.bulk_price_view',
+                icon='edit-3',
+            ),
+        ]
+
+    def contribute_settings_panel(self) -> SettingsPanel | None:
+        # Rendered as a form on /dashboard/apps/advanced_shop/settings/.
+        return SettingsPanel(label='Advanced Shop', schema=self.get_config_schema())
+
+    def get_config_schema(self) -> dict:
+        return {
+            'type': 'object',
+            'properties': {
+                'show_recently_viewed': {'type': 'boolean', 'default': True},
+                'low_stock_threshold':   {'type': 'integer', 'default': 5},
+            },
+        }
+```
+
+**Storefront slot names the dot books theme renders today:**
+
+| Slot | Where |
+|---|---|
+| `home_above_grid`, `home_below_grid` | Home page |
+| `pdp_above_price`, `pdp_below_price`, `pdp_below_form` | Product detail |
+| `cart_summary_extra` | Cart side panel |
+| `checkout_extra` | Checkout sidebar |
+
+Custom themes are free to expose their own slots — there's no fixed list.
+
+**Lifecycle when a merchant enables a plugin** (`/dashboard/apps/`):
+
+1. Toggle flips `PluginConfig.is_enabled` in the DB.
+2. Next process boot calls `ready()` and the three `contribute_*` methods.
+3. `{% storefront_blocks "slot" %}` picks up new blocks.
+4. Dashboard sidebar shows new entries via `plugins.context_processors.plugin_context`.
+5. Settings panel reachable at `/dashboard/apps/<plugin>/settings/`.
+
 ---
 
 ## 6. Models, migrations, indexes

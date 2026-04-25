@@ -5,12 +5,12 @@
 <div class="max-w-6xl mx-auto space-y-4">
   <div>
     <h1 class="text-xl font-semibold tracking-tight">Apps</h1>
-    <p class="text-sm text-[color:var(--text-muted)]">Plugins installed on this Morpheus instance.</p>
+    <p class="text-sm text-[color:var(--text-muted)]">Plugins installed on this Morpheus instance. Toggle to enable storefront blocks, dashboard pages, and admin settings declared by each plugin.</p>
   </div>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
     {% for p in plugins %}
-    <div class="card card-padded">
+    <div class="card card-padded flex flex-col gap-3">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
           <h3 class="font-medium truncate">{{ p.label|default:p.name }}</h3>
@@ -18,7 +18,34 @@
         </div>
         {% if p.active %}<span class="pill pill-success">Active</span>{% else %}<span class="pill pill-neutral">Inactive</span>{% endif %}
       </div>
-      {% if p.description %}<p class="text-sm text-[color:var(--text-muted)] mt-2 line-clamp-3">{{ p.description }}</p>{% endif %}
+      {% if p.description %}<p class="text-sm text-[color:var(--text-muted)] line-clamp-3">{{ p.description }}</p>{% endif %}
+
+      {% if p.pages %}
+      <ul class="text-xs space-y-1 mt-1">
+        {% for page in p.pages %}
+        <li>
+          <a href="{% url 'admin_dashboard:plugin_page' p.name page.slug %}" class="hover:underline inline-flex items-center gap-1.5">
+            <i data-lucide="{{ page.icon|default:'circle' }}" class="h-3.5 w-3.5"></i>
+            {{ page.label }}
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      <div class="flex items-center gap-2 mt-auto pt-2 border-t border-[color:var(--border)]">
+        {% if p.has_settings %}
+        <a href="{% url 'admin_dashboard:plugin_settings' p.name %}" class="btn btn-ghost text-xs"><i data-lucide="settings" class="h-3.5 w-3.5"></i> Settings</a>
+        {% endif %}
+        <form method="post" action="{% url 'admin_dashboard:apps' %}" class="ml-auto">
+          {% csrf_token %}
+          <input type="hidden" name="plugin" value="{{ p.name }}">
+          <input type="hidden" name="enabled" value="{% if p.active %}0{% else %}1{% endif %}">
+          <button class="btn {% if p.active %}btn-ghost{% else %}btn-primary{% endif %} text-xs" type="submit">
+            {% if p.active %}Disable{% else %}Enable{% endif %}
+          </button>
+        </form>
+      </div>
     </div>
     {% empty %}
     <p class="text-sm text-[color:var(--text-muted)]">No plugins discovered.</p>
