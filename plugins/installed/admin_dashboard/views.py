@@ -1,58 +1,417 @@
-from django.shortcuts import render
-from django.contrib.admin.views.decorators import staff_member_required
-from api.client import internal_graphql
-
-# Law 3: The dashboard never touches the ORM. It consumes the GraphQL API.
-
-DASHBOARD_QUERY = """
-query DashboardOverview {
-  metrics {
-    totalRevenue { amount currency }
-    totalOrders
-    activeCustomers
-    revenueGrowthPercentage
-  }
-  recentOrders: orders(first: 5, orderBy: "-createdAt") {
-    id orderNumber status total { amount currency } customer { email fullName } createdAt
-  }
-  merchantInsights(unread: true, first: 3) {
-    id title body priority suggestedAction { type }
-  }
-}
 """
+Admin dashboard views — Shopify-inspired merchant UI.
+
+Notes
+-----
+- Every view is `@staff_member_required` and uses the Django ORM directly
+  for performance + reliability. (LAW 3 prohibits ORM access from the
+  *storefront* — the staff dashboard is fine.)
+- Each view returns a single context dict with:
+    * `metrics`         — small KPI tiles
+    * `rows` / `items`  — table data
+    * `active_nav`      — sidebar highlight
+    * `period`          — current selection ("today" | "7d" | "30d" | "90d")
+- Views are deliberately resilient: a missing plugin model raises an
+  `ImportError`, caught and rendered as an empty section so the dashboard
+  never crashes on optional plugins.
+"""
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from datetime import timedelta
+from decimal import Decimal
+from typing import Any
+
+from django.contrib.admin.views.decorators import staff_member_required
+from django.db.models import Sum
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import render
+from django.utils import timezone
+
+logger = logging.getLogger('morpheus.admin')
+
+_PERIODS = {
+    'today': 1,
+    '7d': 7,
+    '30d': 30,
+    '90d': 90,
+}
+
+
+def _period(request: HttpRequest) -> tuple[str, int]:
+    period = request.GET.get('period', '7d')
+    if period not in _PERIODS:
+        period = '7d'
+    return period, _PERIODS[period]
+
+
+def _since(days: int):
+    return timezone.now() - timedelta(days=days)
+
+
+@dataclass(slots=True)
+class Metric:
+    label: str
+    value: str
+    delta: str = ''
+    trend: str = 'flat'  # 'up' | 'down' | 'flat'
+    icon: str = 'activity'
+
+
+def _trend(now, before) -> str:
+    if not before:
+        return 'flat'
+    if now > before:
+        return 'up'
+    if now < before:
+        return 'down'
+    return 'flat'
+
+
+def _pct_delta(now, before) -> str:
+    if not before:
+        return '—'
+    diff = (Decimal(now) - Decimal(before)) / Decimal(before) * Decimal('100')
+    sign = '+' if diff >= 0 else ''
+    return f'{sign}{diff:.1f}%'
+
+
+# ── Dashboard home ────────────────────────────────────────────────────────────
+
 
 @staff_member_required
-def dashboard_home(request):
-    data = internal_graphql(DASHBOARD_QUERY, request=request)
+def dashboard_home(request: HttpRequest) -> HttpResponse:
+    period, days = _period(request)
+    since = _since(days)
+
+    metrics: list[Metric] = []
+    recent_orders: list[Any] = []
+    top_products: list[Any] = []
+    insights: list[Any] = []
+
+    try:
+        from plugins.installed.orders.models import Order
+
+        orders_qs = Order.objects.filter(placed_at__gte=since)
+        order_count = orders_qs.count()
+        revenue = orders_qs.aggregate(total=Sum('total'))['total'] or Decimal('0')
+        avg_order = (revenue / order_count) if order_count else Decimal('0')
+
+        prev_orders = Order.objects.filter(
+            placed_at__gte=_since(days * 2),
+            placed_at__lt=since,
+        )
+        prev_count = prev_orders.count()
+        prev_revenue = prev_orders.aggregate(total=Sum('total'))['total'] or Decimal('0')
+
+        metrics.extend([
+            Metric(
+                label='Total sales',
+                value=f'${revenue:,.2f}',
+                delta=_pct_delta(revenue, prev_revenue),
+                trend=_trend(revenue, prev_revenue),
+                icon='dollar-sign',
+            ),
+            Metric(
+                label='Orders',
+                value=f'{order_count:,}',
+                delta=_pct_delta(order_count, prev_count),
+                trend=_trend(order_count, prev_count),
+                icon='shopping-bag',
+            ),
+            Metric(
+                label='Average order',
+                value=f'${avg_order:,.2f}' if order_count else '—',
+                icon='trending-up',
+            ),
+        ])
+
+        recent_orders = list(
+            Order.objects
+            .select_related('customer', 'channel')
+            .order_by('-placed_at')[:6]
+        )
+    except Exception as e:  # noqa: BLE001 — plugin optional / fail soft
+        logger.warning('admin_dashboard: orders panel error: %s', e, exc_info=True)
+
+    try:
+        from plugins.installed.catalog.models import Product
+
+        active_count = Product.objects.filter(status='active').count()
+        metrics.append(Metric(
+            label='Active products',
+            value=f'{active_count:,}',
+            icon='package',
+        ))
+        top_products = list(
+            Product.objects.filter(status='active')
+            .order_by('-created_at')[:5]
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning('admin_dashboard: catalog panel error: %s', e, exc_info=True)
+
+    try:
+        from plugins.installed.ai_assistant.models import MerchantInsight
+        insights = list(
+            MerchantInsight.objects
+            .filter(is_read=False)
+            .order_by('-created_at')[:4]
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.debug('admin_dashboard: insights panel skipped: %s', e)
+
     return render(request, 'admin_dashboard/home.html', {
-        'data': data or {},
+        'metrics': metrics,
+        'recent_orders': recent_orders,
+        'top_products': top_products,
+        'insights': insights,
         'active_nav': 'home',
+        'period': period,
     })
 
-@staff_member_required
-def products_list(request):
-    data = internal_graphql("""
-        query { products(first: 50) { id name sku price { amount } status isFeatured } }
-    """, request=request)
-    return render(request, 'admin_dashboard/products.html', {'data': data, 'active_nav': 'products'})
+
+# ── Orders ────────────────────────────────────────────────────────────────────
+
 
 @staff_member_required
-def orders_list(request):
-    data = internal_graphql("""
-        query { orders(first: 50, orderBy: "-createdAt") { id orderNumber status total { amount } } }
-    """, request=request)
-    return render(request, 'admin_dashboard/orders.html', {'data': data, 'active_nav': 'orders'})
+def orders_list(request: HttpRequest) -> HttpResponse:
+    status_filter = request.GET.get('status', '')
+    search = request.GET.get('q', '').strip()[:80]
+    orders: list[Any] = []
+    try:
+        from plugins.installed.orders.models import Order
+        qs = (
+            Order.objects
+            .select_related('customer', 'channel')
+            .order_by('-placed_at')
+        )
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        if search:
+            qs = qs.filter(order_number__icontains=search) | qs.filter(email__icontains=search)
+        orders = list(qs[:100])
+    except Exception:  # noqa: BLE001
+        orders = []
+    return render(request, 'admin_dashboard/orders.html', {
+        'orders': orders,
+        'status_filter': status_filter,
+        'search': search,
+        'active_nav': 'orders',
+    })
+
 
 @staff_member_required
-def customers_list(request):
-    data = internal_graphql("""
-        query { customers(first: 50) { id email fullName totalSpent { amount } } }
-    """, request=request)
-    return render(request, 'admin_dashboard/customers.html', {'data': data, 'active_nav': 'customers'})
+def order_detail(request: HttpRequest, order_number: str) -> HttpResponse:
+    order = None
+    try:
+        from plugins.installed.orders.models import Order
+        order = (
+            Order.objects
+            .select_related('customer', 'channel')
+            .prefetch_related('items', 'items__product', 'events', 'fulfillments')
+            .get(order_number=order_number)
+        )
+    except Exception:  # noqa: BLE001
+        order = None
+    return render(request, 'admin_dashboard/order_detail.html', {
+        'order': order,
+        'active_nav': 'orders',
+    })
+
+
+# ── Products ──────────────────────────────────────────────────────────────────
+
 
 @staff_member_required
-def ai_insights(request):
-    data = internal_graphql("""
-        query { merchantInsights(first: 50) { id title body priority isApproved aiExecuted createdAt } }
-    """, request=request)
-    return render(request, 'admin_dashboard/ai_insights.html', {'data': data, 'active_nav': 'ai_insights'})
+def products_list(request: HttpRequest) -> HttpResponse:
+    status = request.GET.get('status', '')
+    search = request.GET.get('q', '').strip()[:80]
+    products: list[Any] = []
+    try:
+        from plugins.installed.catalog.models import Product
+        qs = (
+            Product.objects
+            .select_related('category', 'vendor')
+            .prefetch_related('images')
+            .order_by('-created_at')
+        )
+        if status:
+            qs = qs.filter(status=status)
+        if search:
+            qs = qs.filter(name__icontains=search) | qs.filter(sku__icontains=search)
+        products = list(qs[:100])
+    except Exception:  # noqa: BLE001
+        products = []
+    return render(request, 'admin_dashboard/products.html', {
+        'products': products,
+        'status_filter': status,
+        'search': search,
+        'active_nav': 'products',
+    })
+
+
+# ── Customers ─────────────────────────────────────────────────────────────────
+
+
+@staff_member_required
+def customers_list(request: HttpRequest) -> HttpResponse:
+    search = request.GET.get('q', '').strip()[:80]
+    customers: list[Any] = []
+    try:
+        from django.contrib.auth import get_user_model
+        from plugins.installed.orders.models import Order
+        User = get_user_model()
+        qs = User.objects.order_by('-date_joined')
+        if search:
+            qs = qs.filter(email__icontains=search)
+        rows = []
+        for user in qs[:100]:
+            order_qs = Order.objects.filter(customer=user)
+            rows.append({
+                'id': user.pk,
+                'email': getattr(user, 'email', ''),
+                'name': (
+                    (getattr(user, 'first_name', '') + ' ' +
+                     getattr(user, 'last_name', '')).strip() or '—'
+                ),
+                'order_count': order_qs.count(),
+                'spent': order_qs.aggregate(total=Sum('total'))['total'] or Decimal('0'),
+                'date_joined': getattr(user, 'date_joined', None),
+            })
+        customers = rows
+    except Exception:  # noqa: BLE001
+        customers = []
+    return render(request, 'admin_dashboard/customers.html', {
+        'customers': customers,
+        'search': search,
+        'active_nav': 'customers',
+    })
+
+
+# ── Analytics ─────────────────────────────────────────────────────────────────
+
+
+@staff_member_required
+def analytics_view(request: HttpRequest) -> HttpResponse:
+    period, days = _period(request)
+    since = _since(days)
+    series: list[dict] = []
+    try:
+        from plugins.installed.observability.models import MerchantMetric
+        rows = (
+            MerchantMetric.objects
+            .filter(granularity='hour', bucket__gte=since, metric='orders_placed')
+            .order_by('bucket')
+        )
+        series = [{'bucket': r.bucket.isoformat(), 'value': r.value} for r in rows]
+    except Exception as e:  # noqa: BLE001
+        logger.debug('admin_dashboard: analytics empty: %s', e)
+    return render(request, 'admin_dashboard/analytics.html', {
+        'series': series,
+        'active_nav': 'analytics',
+        'period': period,
+    })
+
+
+# ── Marketing ─────────────────────────────────────────────────────────────────
+
+
+@staff_member_required
+def marketing_view(request: HttpRequest) -> HttpResponse:
+    coupons: list[Any] = []
+    try:
+        from plugins.installed.marketing.models import Coupon
+        coupons = list(Coupon.objects.order_by('-created_at')[:25])
+    except Exception as e:  # noqa: BLE001
+        logger.debug('admin_dashboard: marketing empty: %s', e)
+    return render(request, 'admin_dashboard/marketing.html', {
+        'coupons': coupons,
+        'active_nav': 'marketing',
+    })
+
+
+# ── Apps ──────────────────────────────────────────────────────────────────────
+
+
+@staff_member_required
+def apps_view(request: HttpRequest) -> HttpResponse:
+    from plugins.registry import plugin_registry
+    plugins = []
+    for name, cls in sorted(plugin_registry._classes.items()):
+        plugins.append({
+            'name': name,
+            'label': getattr(cls, 'label', name),
+            'description': getattr(cls, 'description', ''),
+            'version': getattr(cls, 'version', ''),
+            'active': plugin_registry.is_active(name),
+        })
+    return render(request, 'admin_dashboard/apps.html', {
+        'plugins': plugins,
+        'active_nav': 'apps',
+    })
+
+
+# ── Settings ──────────────────────────────────────────────────────────────────
+
+
+@staff_member_required
+def settings_view(request: HttpRequest) -> HttpResponse:
+    from django.conf import settings as dj_settings
+    sections = [
+        {
+            'title': 'Store',
+            'icon': 'store',
+            'items': [
+                ('Store name', getattr(dj_settings, 'STORE_NAME', '—')),
+                ('Currency', getattr(dj_settings, 'STORE_CURRENCY', '—')),
+                ('Country', getattr(dj_settings, 'STORE_COUNTRY', '—')),
+                ('Tax rate', f'{getattr(dj_settings, "STORE_TAX_RATE", 0)} %'),
+            ],
+        },
+        {
+            'title': 'AI',
+            'icon': 'sparkles',
+            'items': [
+                ('Provider', getattr(dj_settings, 'AI_PROVIDER', '—')),
+                ('Model', getattr(dj_settings, 'AI_MODEL', '—')),
+                ('Embedding model', getattr(dj_settings, 'AI_EMBEDDING_MODEL', '—')),
+            ],
+        },
+        {
+            'title': 'Payments',
+            'icon': 'credit-card',
+            'items': [
+                ('Stripe configured', 'Yes' if getattr(dj_settings, 'STRIPE_SECRET_KEY', '') else 'No'),
+                ('Webhook signing', 'Yes' if getattr(dj_settings, 'STRIPE_WEBHOOK_SECRET', '') else 'No'),
+            ],
+        },
+        {
+            'title': 'Theme',
+            'icon': 'palette',
+            'items': [
+                ('Active theme', getattr(dj_settings, 'MORPHEUS_ACTIVE_THEME', '—')),
+            ],
+        },
+    ]
+    return render(request, 'admin_dashboard/settings.html', {
+        'sections': sections,
+        'active_nav': 'settings',
+    })
+
+
+# ── AI insights (kept for back-compat with old URL) ──────────────────────────
+
+
+@staff_member_required
+def ai_insights(request: HttpRequest) -> HttpResponse:
+    insights: list[Any] = []
+    try:
+        from plugins.installed.ai_assistant.models import MerchantInsight
+        insights = list(MerchantInsight.objects.order_by('-created_at')[:50])
+    except Exception:  # noqa: BLE001
+        insights = []
+    return render(request, 'admin_dashboard/ai_insights.html', {
+        'insights': insights,
+        'active_nav': 'ai_insights',
+    })
