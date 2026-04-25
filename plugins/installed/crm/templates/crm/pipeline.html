@@ -1,0 +1,30 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Pipeline · Morpheus admin{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-2">{% if pipeline %}{{ pipeline.name }}{% else %}Pipeline{% endif %}</h1>
+
+{% if not pipeline %}
+<div class="card card-padded">
+  <p>No pipeline configured. The default pipeline is created automatically when the plugin first runs.</p>
+</div>
+{% else %}
+<div style="display:grid; grid-template-columns: repeat({{ stages|length }}, minmax(220px, 1fr)); gap: .75rem; overflow-x: auto;">
+  {% for col in stages %}
+  <div>
+    <div style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-bottom:.5rem;">
+      {{ col.stage.name }} · {{ col.deals|length }}
+    </div>
+    {% for d in col.deals %}
+    <div class="card card-padded" style="margin-bottom:.5rem; padding:.75rem;">
+      <p class="font-medium" style="font-size:.9rem;">{{ d.name }}</p>
+      <p style="font-size:.8rem; color:var(--text-muted); margin-top:.25rem;">{{ d.value }}{% if d.account %} · {{ d.account.name }}{% endif %}</p>
+    </div>
+    {% empty %}
+    <p style="font-size:.75rem; color:var(--text-subtle);">—</p>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

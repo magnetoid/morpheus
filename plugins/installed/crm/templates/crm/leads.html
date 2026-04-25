@@ -1,0 +1,35 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Leads · Morpheus admin{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">Leads</h1>
+
+<div class="card">
+  <table class="morph-table">
+    <thead>
+      <tr><th>Email</th><th>Name</th><th>Company</th><th>Source</th><th>Status</th><th>Score</th><th>Created</th></tr>
+    </thead>
+    <tbody>
+    {% for l in leads %}
+      <tr>
+        <td>{{ l.email }}</td>
+        <td>{{ l.display_name }}</td>
+        <td>{{ l.company }}</td>
+        <td>{{ l.source }}</td>
+        <td>
+          <span class="pill {% if l.status == 'converted' %}pill-success{% elif l.status == 'lost' %}pill-danger{% elif l.status == 'qualified' %}pill-info{% else %}pill-neutral{% endif %}">
+            {{ l.status }}
+          </span>
+        </td>
+        <td>{{ l.score }}</td>
+        <td>{{ l.created_at|date:"M j" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" style="text-align:center; padding: 2rem; color: var(--text-muted);">
+        No leads yet.
+      </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -56,6 +56,7 @@ MORPHEUS_DEFAULT_PLUGINS = [
     'plugins.installed.demo_data',
     'plugins.installed.advanced_ecommerce',
     'plugins.installed.agent_core',
+    'plugins.installed.crm',
 ]
 
 # ── Extra plugins installed by merchant via .env ───────────────────────────────
@@ -231,6 +232,10 @@ if _RUNNING_TESTS:
             'LOCATION': 'morpheus-tests',
         }
     }
+    # Tests create lots of users; PBKDF2 with 200k iterations dominates the
+    # suite runtime. Drop to MD5 in tests only — never reachable in prod
+    # because this branch is gated by `_RUNNING_TESTS`.
+    PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 else:
     CACHES = {
         'default': {
