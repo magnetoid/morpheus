@@ -63,8 +63,11 @@ def home(request):
             id name slug image { url }
           }
         }
-    """, request=request)
-    return render(request, 'storefront/home.html', data or {})
+    """, request=request) or {}
+    # Templates use snake_case; GraphQL returns camelCase. Normalise.
+    data.setdefault('featured_products', data.get('featuredProducts', []) or [])
+    data.setdefault('seasonal_products', data.get('featured_products', []))
+    return render(request, 'storefront/home.html', data)
 
 
 def product_list(request):
