@@ -36,11 +36,13 @@ class Cart(models.Model):
 
     @property
     def subtotal(self):
-        from django.db.models import Sum, F, DecimalField
-        result = self.items.aggregate(
-            total=Sum(F('quantity') * F('unit_price_amount'), output_field=DecimalField())
+        from decimal import Decimal
+        # MoneyField stores the amount in the column with the field name itself.
+        # Cross-row arithmetic stays Pythonic to avoid currency-mixing bugs.
+        return sum(
+            (Decimal(item.unit_price.amount) * item.quantity for item in self.items.all()),
+            Decimal('0'),
         )
-        return result['total'] or 0
 
     @property
     def item_count(self):
