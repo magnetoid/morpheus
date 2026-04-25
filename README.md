@@ -230,9 +230,11 @@ Beat schedule registered automatically by the [observability plugin](plugins/ins
 
 ## Documentation
 
+- [`SKILLS.md`](SKILLS.md) — **the build & extend playbook**. Named, repeatable procedures for every common task (add a plugin, add a resolver, fix N+1, deploy to Coolify, …). Start here before writing code.
 - [`RULES.md`](RULES.md) — the platform's 11 laws. Read before opening a PR.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — system design, plugin lifecycle, data flow.
 - [`AI_VISION.md`](AI_VISION.md) — the agent-first thesis and roadmap.
+- [`docs/deploy-coolify.md`](docs/deploy-coolify.md) — Coolify deployment.
 
 ---
 
@@ -241,9 +243,10 @@ Beat schedule registered automatically by the [observability plugin](plugins/ins
 PRs welcome. The bar:
 
 1. New behavior comes with tests. The whole suite is fast — keep it that way.
-2. Don't add a top-level Django app for a new domain — make it a plugin.
+2. Don't add a top-level Django app for a new domain — make it a plugin (see [Skill: add a new plugin](SKILLS.md#skill-add-a-new-plugin)).
 3. Don't catch broad `Exception` without `exc_info=True` + a one-line comment explaining why.
 4. Honor the security defaults in [`morph/settings.py`](morph/settings.py).
+5. The change is reachable from a [skill in `SKILLS.md`](SKILLS.md) — add or update one in the same PR if it isn't.
 
 ---
 
