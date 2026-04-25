@@ -105,17 +105,22 @@ agent to do work in this repo.
 ### Skill: add a new plugin
 **When:** any new domain (subscriptions, gift cards, tax engine, etc.).
 **Prereqs:** decide a plugin `name` (snake_case, must equal directory).
-**Steps:**
+**Steps (scaffolder — recommended):**
+1. `python manage.py morph_create_plugin <name> --label "Display Name" [--with-models] [--with-graphql] [--with-urls] [--with-tasks]`
+2. Add `'plugins.installed.<name>'` to `MORPHEUS_DEFAULT_PLUGINS` in [`morph/settings.py`](morph/settings.py).
+3. If `--with-models`: `python manage.py makemigrations <name> && python manage.py migrate`.
+4. `python manage.py check` — your plugin should appear in the activation log.
+
+**Manual scaffold** (when you need a non-standard layout):
 1. `mkdir -p plugins/installed/<name>/{graphql,migrations,tests}`
 2. Create `__init__.py` setting `default_app_config = 'plugins.installed.<name>.apps.<Name>Config'`.
-3. Create `apps.py` with a `<Name>Config` (`name = 'plugins.installed.<name>'`, `label = '<name>'`).
+3. Create `apps.py` with `<Name>Config` (`name = 'plugins.installed.<name>'`, `label = '<name>'`).
 4. Create `migrations/__init__.py` (empty).
-5. Create `models.py` (use `BigAutoField` or UUID PK — see [Skill: add a model](#skill-add-a-model)).
-6. Create `plugin.py` subclassing `MorpheusPlugin`. Set `name`, `label`, `version`, `requires`, `has_models`. Implement `ready()` to register hooks/GraphQL/URLs.
-7. Add `'plugins.installed.<name>'` to `MORPHEUS_DEFAULT_PLUGINS` in [`morph/settings.py`](morph/settings.py).
-8. `python manage.py makemigrations` + `migrate`.
+5. Create `plugin.py` subclassing `MorpheusPlugin`. Metadata is validated at class-definition time — typos fail fast.
+6. Add the path to `MORPHEUS_DEFAULT_PLUGINS` and run migrations.
+
 **Validate:** plugin appears in the activation log and in `Query.activePlugins`.
-**See also:** [`plugins/base.py`](plugins/base.py), [`plugins/registry.py`](plugins/registry.py), [Skill: wire a hook listener](#skill-wire-a-hook-listener).
+**See also:** [`docs/PLUGIN_DEVELOPMENT.md`](docs/PLUGIN_DEVELOPMENT.md) (full developer guide), [`plugins/base.py`](plugins/base.py), [`plugins/registry.py`](plugins/registry.py), [Skill: wire a hook listener](#skill-wire-a-hook-listener).
 
 ### Skill: wire a hook listener
 **When:** the plugin needs to react to a domain event (e.g. `order.placed`).
