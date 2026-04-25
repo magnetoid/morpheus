@@ -2,11 +2,17 @@
 Morpheus CMS — Django Settings (Revised: Plugin-Native Architecture)
 """
 import os
+import sys
 from pathlib import Path
 from decouple import config, Csv
 import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# True when running `python manage.py test` or pytest. Used to relax a few
+# defaults (DATABASE_URL fallback, cache backend) so the suite runs without
+# a real Postgres / Redis around.
+_RUNNING_TESTS = 'test' in sys.argv or sys.argv[0].endswith('pytest')
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 SECRET_KEY = config(
@@ -47,6 +53,7 @@ MORPHEUS_DEFAULT_PLUGINS = [
     'plugins.installed.marketplace',
     'plugins.installed.cloudflare',
     'plugins.installed.seo',
+    'plugins.installed.demo_data',
 ]
 
 # ── Extra plugins installed by merchant via .env ───────────────────────────────
@@ -151,12 +158,22 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'morph.wsgi.application'
 
-# ── Database (Supabase PostgreSQL) ─────────────────────────────────────────────
-DATABASES = {
-    'default': dj_database_url.config(
-        default=config('DATABASE_URL', default=f'sqlite:///{BASE_DIR}/db.sqlite3'),
-        conn_max_age=600,
+# ── Database (Supabase / Postgres) ─────────────────────────────────────────────
+# Production: DATABASE_URL must be a Postgres URL (Supabase recommended).
+# Tests: a SQLite in-memory DB is used automatically — see _RUNNING_TESTS.
+_default_db_url = config(
+    'DATABASE_URL',
+    default='sqlite:///:memory:' if _RUNNING_TESTS else '',
+)
+if not _default_db_url:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        "DATABASE_URL must be set. Use a Postgres URL (Supabase recommended). "
+        "See .env.example for the exact format."
     )
+
+DATABASES = {
+    'default': dj_database_url.config(default=_default_db_url, conn_max_age=600),
 }
 
 # Optional: Add read-replica for enterprise scaling
@@ -199,10 +216,6 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # ── Cache & Celery ─────────────────────────────────────────────────────────────
 REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
-
-import sys as _sys
-
-_RUNNING_TESTS = 'test' in _sys.argv or 'pytest' in _sys.argv[0]
 
 if _RUNNING_TESTS:
     CACHES = {
@@ -341,6 +354,7 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@morpheusstore
 
 # ── Security ───────────────────────────────────────────────────────────────────
 if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_SSL_REDIRECT = True
