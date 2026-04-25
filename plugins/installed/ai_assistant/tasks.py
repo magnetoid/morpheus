@@ -37,6 +37,18 @@ def generate_product_description(product_id):
     operator = AgentOperator()
     operator.run_workflow(f"Product {product_id} was just created but lacks a description. Retrieve its name, category, and metadata, and autonomously write a compelling, SEO-optimized 3-paragraph product description.")
 
+@shared_task(bind=True, time_limit=60, soft_time_limit=45)
+def refresh_product_embedding(self, product_id):
+    """Compute and persist the embedding for a product (idempotent on text hash)."""
+    from plugins.installed.catalog.models import Product
+    from plugins.installed.ai_assistant.services.search import upsert_product_embedding
+    try:
+        product = Product.objects.select_related('category').get(pk=product_id)
+    except Product.DoesNotExist:
+        return
+    upsert_product_embedding(product)
+
+
 @shared_task
 def evaluate_all_product_prices():
     """

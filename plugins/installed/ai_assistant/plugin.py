@@ -34,6 +34,7 @@ class AIAssistantPlugin(MorpheusPlugin):
         self.register_hook(MorpheusEvents.SEARCH_PERFORMED, self.on_search_performed, priority=80)
         self.register_hook(MorpheusEvents.CART_ABANDONED, self.on_cart_abandoned, priority=80)
         self.register_hook(MorpheusEvents.PRODUCT_CREATED, self.on_product_created, priority=90)
+        self.register_hook(MorpheusEvents.PRODUCT_UPDATED, self.on_product_updated, priority=90)
 
         # Price filter — AI can influence pricing
         self.register_hook(MorpheusEvents.PRODUCT_CALCULATE_PRICE, self.on_calculate_price, priority=50)
@@ -68,10 +69,25 @@ class AIAssistantPlugin(MorpheusPlugin):
         generate_cart_recovery.delay(str(cart.id))
 
     def on_product_created(self, product, **kwargs):
-        """If product has no description, auto-generate one."""
+        """If product has no description, auto-generate one. Always (re)embed."""
         if not product.description:
             from plugins.installed.ai_assistant.tasks import generate_product_description
             generate_product_description.delay(str(product.id))
+        self._enqueue_embedding(product)
+
+    def on_product_updated(self, product, **kwargs):
+        self._enqueue_embedding(product)
+
+    def _enqueue_embedding(self, product) -> None:
+        """Best-effort: schedule an embedding refresh; never raise from a hook."""
+        try:
+            from plugins.installed.ai_assistant.tasks import refresh_product_embedding
+            refresh_product_embedding.delay(str(product.id))
+        except Exception:  # noqa: BLE001 — task system may be down; degrade gracefully
+            import logging
+            logging.getLogger('morpheus.ai').warning(
+                'Failed to enqueue embedding refresh for product %s', product.id,
+            )
 
     def on_calculate_price(self, value, product=None, customer=None, **kwargs):
         """AI dynamic pricing hook — returns adjusted price if strategy active."""
