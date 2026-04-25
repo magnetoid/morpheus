@@ -1,0 +1,28 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Apps · Morpheus{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Apps</h1>
+    <p class="text-sm text-[color:var(--text-muted)]">Plugins installed on this Morpheus instance.</p>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    {% for p in plugins %}
+    <div class="card card-padded">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h3 class="font-medium truncate">{{ p.label|default:p.name }}</h3>
+          <p class="text-xs text-[color:var(--text-muted)] mt-0.5">{{ p.name }} · v{{ p.version }}</p>
+        </div>
+        {% if p.active %}<span class="pill pill-success">Active</span>{% else %}<span class="pill pill-neutral">Inactive</span>{% endif %}
+      </div>
+      {% if p.description %}<p class="text-sm text-[color:var(--text-muted)] mt-2 line-clamp-3">{{ p.description }}</p>{% endif %}
+    </div>
+    {% empty %}
+    <p class="text-sm text-[color:var(--text-muted)]">No plugins discovered.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

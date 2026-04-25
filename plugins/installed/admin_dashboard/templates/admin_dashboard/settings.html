@@ -1,0 +1,30 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Settings · Morpheus{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Settings</h1>
+    <p class="text-sm text-[color:var(--text-muted)]">Read-only summary of the active configuration.</p>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    {% for s in sections %}
+    <div class="card card-padded">
+      <div class="flex items-center gap-2">
+        <i data-lucide="{{ s.icon }}" class="h-4 w-4 text-[color:var(--text-muted)]"></i>
+        <h3 class="font-semibold">{{ s.title }}</h3>
+      </div>
+      <dl class="mt-3 divide-y divide-[color:var(--border)]">
+        {% for k, v in s.items %}
+        <div class="flex items-center justify-between py-2">
+          <dt class="text-sm text-[color:var(--text-muted)]">{{ k }}</dt>
+          <dd class="text-sm font-medium">{{ v }}</dd>
+        </div>
+        {% endfor %}
+      </dl>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

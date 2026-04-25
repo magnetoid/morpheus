@@ -1,63 +1,49 @@
 {% extends "admin_dashboard/base.html" %}
+{% block title %}AI insights · Morpheus{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-3xl font-bold tracking-tight">Merchant Insights</h1>
-            <p class="text-[hsl(var(--muted-foreground))] mt-1">AI-generated operational intelligence and autonomous actions.</p>
-        </div>
-    </div>
+<div class="max-w-5xl mx-auto space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">AI insights</h1>
+    <p class="text-sm text-[color:var(--text-muted)]">Suggestions and risks surfaced by the AI assistant.</p>
+  </div>
 
-    <div class="grid gap-6">
-        {% for insight in data.merchantInsights %}
-        <div class="card rounded-lg border bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-sm overflow-hidden">
-            <div class="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/30 px-6 py-4 flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                    {% if insight.priority == 'critical' %}
-                        <div class="h-2.5 w-2.5 rounded-full bg-red-500"></div>
-                    {% elif insight.priority == 'high' %}
-                        <div class="h-2.5 w-2.5 rounded-full bg-amber-500"></div>
-                    {% else %}
-                        <div class="h-2.5 w-2.5 rounded-full bg-blue-500"></div>
-                    {% endif %}
-                    <h3 class="font-semibold text-lg">{{ insight.title }}</h3>
-                </div>
-                <span class="text-xs text-[hsl(var(--muted-foreground))]">Just now</span>
-            </div>
-            <div class="p-6">
-                <p class="text-sm leading-relaxed mb-6">{{ insight.body }}</p>
-                
-                {% if insight.suggestedAction %}
-                <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/50 p-4">
-                    <h4 class="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))] mb-3">Suggested Autonomous Action</h4>
-                    <div class="flex items-center justify-between">
-                        <code class="text-sm font-mono text-[hsl(var(--primary))] bg-[hsl(var(--background))] px-2 py-1 rounded border border-[hsl(var(--border))]">
-                            {{ insight.suggestedAction.type }}
-                        </code>
-                        <div class="space-x-2">
-                            <button class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow hover:bg-[hsl(var(--primary))]/90 h-9 px-4 py-2">
-                                <i data-lucide="check" class="mr-2 h-4 w-4"></i> Approve & Execute
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        {% empty %}
-        <div class="card rounded-lg border border-dashed bg-transparent p-12 text-center">
-            <div class="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
-                <div class="flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--muted))] mb-4">
-                    <i data-lucide="check-circle-2" class="h-10 w-10 text-emerald-500"></i>
-                </div>
-                <h3 class="mt-4 text-lg font-semibold">Store is fully optimized</h3>
-                <p class="mb-4 mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-                    Morpheus AI has no active insights or alerts at the moment. As data flows in, AI operators will suggest actions here.
-                </p>
-            </div>
-        </div>
+  <div class="card overflow-hidden">
+    {% if insights %}
+    <table class="morph-table">
+      <thead><tr><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Created</th></tr></thead>
+      <tbody>
+        {% for i in insights %}
+        <tr>
+          <td>
+            <div class="font-medium">{{ i.title }}</div>
+            <div class="text-xs text-[color:var(--text-muted)] line-clamp-1">{{ i.body }}</div>
+          </td>
+          <td class="text-[color:var(--text-muted)]">{{ i.get_insight_type_display }}</td>
+          <td>
+            {% if i.priority == 'critical' %}<span class="pill pill-danger">Critical</span>
+            {% elif i.priority == 'high' %}<span class="pill pill-warn">High</span>
+            {% elif i.priority == 'medium' %}<span class="pill pill-info">Medium</span>
+            {% else %}<span class="pill pill-neutral">Low</span>{% endif %}
+          </td>
+          <td>
+            {% if i.is_approved %}<span class="pill pill-success">Approved</span>
+            {% elif i.ai_executed %}<span class="pill pill-info">Executed</span>
+            {% elif i.is_read %}<span class="pill pill-neutral">Read</span>
+            {% else %}<span class="pill pill-warn">New</span>{% endif %}
+          </td>
+          <td class="text-[color:var(--text-muted)] whitespace-nowrap">{{ i.created_at|date:"M j, Y" }}</td>
+        </tr>
         {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="card-padded text-center py-16">
+      <i data-lucide="sparkles" class="h-10 w-10 mx-auto mb-3 text-[color:var(--text-subtle)]"></i>
+      <h3 class="font-medium">No AI insights yet</h3>
+      <p class="text-sm text-[color:var(--text-muted)] mt-1">The AI assistant will populate this view as it analyzes your store.</p>
     </div>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

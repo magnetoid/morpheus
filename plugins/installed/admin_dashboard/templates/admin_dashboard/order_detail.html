@@ -1,0 +1,105 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Order · Morpheus{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-4">
+  <div class="flex items-center gap-2 text-sm text-[color:var(--text-muted)]">
+    <a href="{% url 'admin_dashboard:orders' %}" class="hover:underline">Orders</a>
+    <i data-lucide="chevron-right" class="h-3.5 w-3.5"></i>
+    <span class="font-medium text-[color:var(--text)]">#{{ order.order_number|default:"—" }}</span>
+  </div>
+
+  {% if order %}
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-semibold">Order #{{ order.order_number }}</h1>
+    <div class="flex items-center gap-2">
+      <button class="btn"><i data-lucide="printer" class="h-4 w-4"></i> Print</button>
+      <button class="btn"><i data-lucide="refresh-ccw" class="h-4 w-4"></i> Refund</button>
+      <button class="btn btn-primary"><i data-lucide="check-circle" class="h-4 w-4"></i> Mark fulfilled</button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="lg:col-span-2 space-y-4">
+      <div class="card">
+        <div class="card-padded flex items-center justify-between">
+          <h2 class="font-semibold">Items</h2>
+          {% if order.status == 'fulfilled' or order.status == 'delivered' %}<span class="pill pill-success">{{ order.get_status_display }}</span>
+          {% elif order.status == 'cancelled' or order.status == 'refunded' %}<span class="pill pill-danger">{{ order.get_status_display }}</span>
+          {% else %}<span class="pill pill-warn">{{ order.get_status_display }}</span>{% endif %}
+        </div>
+        <table class="morph-table">
+          <thead><tr><th>Product</th><th class="text-right">Qty</th><th class="text-right">Unit</th><th class="text-right">Subtotal</th></tr></thead>
+          <tbody>
+            {% for it in order.items.all %}
+            <tr>
+              <td>
+                <div class="font-medium">{{ it.product_name }}</div>
+                {% if it.variant_name %}<div class="text-xs text-[color:var(--text-muted)]">{{ it.variant_name }}</div>{% endif %}
+                <div class="text-xs text-[color:var(--text-muted)]">{{ it.sku }}</div>
+              </td>
+              <td class="text-right">{{ it.quantity }}</td>
+              <td class="text-right text-[color:var(--text-muted)]">{{ it.unit_price }}</td>
+              <td class="text-right font-medium">{{ it.total_price }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="card-padded border-t border-[color:var(--border)] space-y-1.5 text-sm">
+          <div class="flex justify-between text-[color:var(--text-muted)]"><span>Subtotal</span><span>{{ order.subtotal }}</span></div>
+          {% if order.discount_total %}<div class="flex justify-between text-[color:var(--text-muted)]"><span>Discount</span><span>−{{ order.discount_total }}</span></div>{% endif %}
+          <div class="flex justify-between text-[color:var(--text-muted)]"><span>Shipping</span><span>{{ order.shipping_total }}</span></div>
+          <div class="flex justify-between text-[color:var(--text-muted)]"><span>Tax</span><span>{{ order.tax_total }}</span></div>
+          <div class="flex justify-between font-semibold pt-1 border-t border-[color:var(--border)]"><span>Total</span><span>{{ order.total }}</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-padded">
+          <h2 class="font-semibold">Timeline</h2>
+        </div>
+        <div class="px-5 pb-5 space-y-3">
+          {% for ev in order.events.all %}
+          <div class="flex items-start gap-3">
+            <div class="h-7 w-7 rounded-full bg-[color:var(--surface-2)] border border-[color:var(--border)] flex items-center justify-center">
+              <i data-lucide="dot" class="h-4 w-4"></i>
+            </div>
+            <div>
+              <div class="text-sm font-medium">{{ ev.event_type }}</div>
+              <div class="text-xs text-[color:var(--text-muted)]">{{ ev.previous_state|default:"—" }} → {{ ev.new_state|default:"—" }} · {{ ev.created_at|date:"M j, H:i" }}</div>
+              {% if ev.message %}<div class="text-sm text-[color:var(--text-muted)] mt-0.5">{{ ev.message }}</div>{% endif %}
+            </div>
+          </div>
+          {% empty %}
+          <p class="text-sm text-[color:var(--text-muted)]">No timeline events yet.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <div class="card card-padded">
+        <h3 class="font-semibold">Customer</h3>
+        <p class="mt-2 text-sm">{{ order.customer.email|default:order.email }}</p>
+        {% if order.customer %}
+        <p class="text-xs text-[color:var(--text-muted)]">{{ order.customer.first_name }} {{ order.customer.last_name }}</p>
+        {% endif %}
+      </div>
+      <div class="card card-padded">
+        <h3 class="font-semibold">Shipping address</h3>
+        {% if order.shipping_address %}
+          <pre class="mt-2 text-xs bg-[color:var(--surface-2)] p-2 rounded overflow-auto whitespace-pre-wrap">{{ order.shipping_address }}</pre>
+        {% else %}
+          <p class="mt-2 text-sm text-[color:var(--text-muted)]">No shipping address.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card card-padded text-center py-16">
+    <i data-lucide="search-x" class="h-10 w-10 mx-auto mb-3 text-[color:var(--text-subtle)]"></i>
+    <h3 class="font-medium">Order not found</h3>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

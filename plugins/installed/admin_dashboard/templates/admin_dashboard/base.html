@@ -1,164 +1,137 @@
-{% load static %}
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="en" class="light">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Morpheus Admin</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- shadcn/ui inspired base styles -->
-    <style>
-        :root {
-            /* Shopify Polaris inspired light theme */
-            --background: 210 20% 96%; /* #f4f6f8 */
-            --foreground: 210 11% 15%; /* #202223 */
-            --card: 0 0% 100%; /* #ffffff */
-            --card-foreground: 210 11% 15%; /* #202223 */
-            --popover: 0 0% 100%;
-            --popover-foreground: 210 11% 15%;
-            --primary: 165 100% 25%; /* Polaris Green #008060 */
-            --primary-foreground: 0 0% 100%; /* White */
-            --secondary: 210 20% 96%; /* Light gray */
-            --secondary-foreground: 210 11% 15%;
-            --muted: 210 24% 93%; /* #e4e5e7 */
-            --muted-foreground: 210 9% 46%; /* #6d7175 */
-            --accent: 210 24% 93%;
-            --accent-foreground: 210 11% 15%;
-            --destructive: 0 84.2% 60.2%;
-            --destructive-foreground: 210 40% 98%;
-            --border: 210 14% 89%; /* #e1e3e5 */
-            --input: 210 14% 89%; /* #8c9196 */
-            --ring: 165 100% 25%; /* Green ring */
-            --radius: 0.5rem;
-        }
-
-        .dark {
-            /* Shopify admin doesn't officially have a true dark mode yet, but mapping for consistency */
-            --background: 222.2 84% 4.9%;
-            --foreground: 210 40% 98%;
-            --card: 222.2 84% 4.9%;
-            --card-foreground: 210 40% 98%;
-            --popover: 222.2 84% 4.9%;
-            --popover-foreground: 210 40% 98%;
-            --primary: 165 100% 40%; /* Lighter green for dark mode */
-            --primary-foreground: 0 0% 100%;
-            --secondary: 217.2 32.6% 17.5%;
-            --secondary-foreground: 210 40% 98%;
-            --muted: 217.2 32.6% 17.5%;
-            --muted-foreground: 215 20.2% 65.1%;
-            --accent: 217.2 32.6% 17.5%;
-            --accent-foreground: 210 40% 98%;
-            --destructive: 0 62.8% 30.6%;
-            --destructive-foreground: 210 40% 98%;
-            --border: 217.2 32.6% 17.5%;
-            --input: 217.2 32.6% 17.5%;
-            --ring: 165 100% 40%;
-        }
-
-        body {
-            background-color: hsl(var(--background));
-            color: hsl(var(--foreground));
-        }
-        
-        .card {
-            background-color: hsl(var(--card));
-            color: hsl(var(--card-foreground));
-            border: 1px solid hsl(var(--border));
-            border-radius: var(--radius);
-            box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-        }
-
-        /* Lucide Icons via CDN */
-        @import url("https://unpkg.com/lucide@latest/lucide.css");
-    </style>
-    <script src="https://unpkg.com/lucide@latest"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f1f1f1">
+<title>{% block title %}Morpheus admin{% endblock %}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root {
+    --bg:           #f1f1f1;
+    --surface:      #ffffff;
+    --surface-2:    #fafafa;
+    --border:       #e3e3e3;
+    --border-strong:#cccccc;
+    --text:         #1a1a1a;
+    --text-muted:   #6b7280;
+    --text-subtle:  #9ca3af;
+    --primary:      #1a1a1a;
+    --primary-fg:   #ffffff;
+    --accent:       #303030;
+    --success:      #1f7a4d;
+    --success-bg:   #d6f3e3;
+    --warn:         #b86e00;
+    --warn-bg:      #ffeacc;
+    --danger:       #b3261e;
+    --danger-bg:    #fde7e9;
+    --info:         #1d4ed8;
+    --info-bg:      #dbeafe;
+    --radius:       8px;
+    --radius-sm:    6px;
+    --shadow-card:  0 0 0 1px var(--border), 0 1px 0 rgba(0,0,0,.04);
+    --shadow-pop:   0 12px 24px -8px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.08);
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-card); }
+  .card-padded { padding: 1.25rem; }
+  .btn { display:inline-flex; align-items:center; gap:.5rem; padding:.5rem .85rem; font-size:.875rem; font-weight:500; border-radius: var(--radius-sm); border:1px solid var(--border); background:var(--surface); color:var(--text); transition:background .15s, border-color .15s; }
+  .btn:hover { background: var(--surface-2); }
+  .btn-primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+  .btn-primary:hover { background: var(--accent); }
+  .btn-ghost { background: transparent; border-color: transparent; }
+  .btn-ghost:hover { background: var(--surface-2); }
+  .pill { display:inline-flex; align-items:center; padding:.125rem .5rem; border-radius:9999px; font-size:.75rem; font-weight:500; line-height:1.4; }
+  .pill-success { background: var(--success-bg); color: var(--success); }
+  .pill-warn    { background: var(--warn-bg); color: var(--warn); }
+  .pill-danger  { background: var(--danger-bg); color: var(--danger); }
+  .pill-info    { background: var(--info-bg); color: var(--info); }
+  .pill-neutral { background: var(--surface-2); color: var(--text-muted); border:1px solid var(--border); }
+  table.morph-table { width:100%; border-collapse: separate; border-spacing:0; }
+  table.morph-table th { text-align:left; font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; font-weight:600; color: var(--text-muted); padding:.75rem 1rem; background: var(--surface-2); border-bottom:1px solid var(--border); }
+  table.morph-table td { padding:.85rem 1rem; font-size:.875rem; border-bottom:1px solid var(--border); vertical-align: middle; }
+  table.morph-table tr:hover td { background: var(--surface-2); }
+  table.morph-table tr:last-child td { border-bottom: none; }
+  .nav-link { display:flex; align-items:center; gap:.65rem; padding:.45rem .65rem; border-radius: var(--radius-sm); color: var(--text); font-size:.875rem; font-weight:500; }
+  .nav-link:hover { background: rgba(0,0,0,.06); }
+  .nav-link.active { background: rgba(0,0,0,.08); }
+  .nav-section { padding:.5rem .65rem .25rem; font-size:.7rem; font-weight:600; color: var(--text-muted); text-transform: uppercase; letter-spacing:.06em; }
+  .input { width:100%; height:2.25rem; padding:0 .75rem; font-size:.875rem; border-radius: var(--radius-sm); border:1px solid var(--border); background: var(--surface); color: var(--text); }
+  .input:focus { outline: none; border-color: var(--text); box-shadow: 0 0 0 2px rgba(0,0,0,.08); }
+  .input-search { padding-left: 2rem; }
+  .drawer-backdrop { position:fixed; inset:0; background: rgba(0,0,0,.4); z-index:40; display:none; }
+  .drawer-backdrop.open { display:block; }
+  @keyframes fadein { from {opacity:0; transform:translateY(2px)} to {opacity:1; transform:none} }
+  .fadein { animation: fadein .12s ease-out both; }
+</style>
 </head>
-<body class="flex h-screen overflow-hidden antialiased font-sans">
-    
-    <!-- Sidebar -->
-    <aside class="w-64 border-r border-[hsl(var(--border))] bg-[hsl(var(--background))] flex flex-col hidden md:flex">
-        <div class="h-14 flex items-center px-4 border-b border-[hsl(var(--border))]">
-            <i data-lucide="hexagon" class="h-6 w-6 mr-2 text-[hsl(var(--primary))]"></i>
-            <span class="font-bold tracking-tight">Morpheus CMS</span>
-        </div>
-        <nav class="flex-1 overflow-y-auto py-4 space-y-1 px-2">
-            <a href="{% url 'admin_dashboard:home' %}" class="flex items-center px-3 py-2 text-sm font-medium rounded-md {% if active_nav == 'home' %}bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]{% else %}text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary))] hover:text-[hsl(var(--secondary-foreground))]{% endif %}">
-                <i data-lucide="layout-dashboard" class="mr-3 h-4 w-4"></i> Dashboard
-            </a>
-            <a href="{% url 'admin_dashboard:orders' %}" class="flex items-center px-3 py-2 text-sm font-medium rounded-md {% if active_nav == 'orders' %}bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]{% else %}text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary))] hover:text-[hsl(var(--secondary-foreground))]{% endif %}">
-                <i data-lucide="shopping-cart" class="mr-3 h-4 w-4"></i> Orders
-            </a>
-            <a href="{% url 'admin_dashboard:products' %}" class="flex items-center px-3 py-2 text-sm font-medium rounded-md {% if active_nav == 'products' %}bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]{% else %}text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary))] hover:text-[hsl(var(--secondary-foreground))]{% endif %}">
-                <i data-lucide="package" class="mr-3 h-4 w-4"></i> Products
-            </a>
-            <a href="{% url 'admin_dashboard:customers' %}" class="flex items-center px-3 py-2 text-sm font-medium rounded-md {% if active_nav == 'customers' %}bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]{% else %}text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary))] hover:text-[hsl(var(--secondary-foreground))]{% endif %}">
-                <i data-lucide="users" class="mr-3 h-4 w-4"></i> Customers
-            </a>
-            
-            <div class="pt-4 pb-2">
-                <p class="px-3 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">AI Operations</p>
-            </div>
-            
-            <a href="{% url 'admin_dashboard:ai_insights' %}" class="flex items-center px-3 py-2 text-sm font-medium rounded-md {% if active_nav == 'ai_insights' %}bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]{% else %}text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary))] hover:text-[hsl(var(--secondary-foreground))]{% endif %}">
-                <i data-lucide="sparkles" class="mr-3 h-4 w-4 text-amber-500"></i> Merchant Insights
-                {% if data.merchantInsights|length > 0 %}
-                <span class="ml-auto bg-amber-100 text-amber-800 py-0.5 px-2 rounded-full text-xs font-medium">{{ data.merchantInsights|length }}</span>
-                {% endif %}
-            </a>
-            <a href="#" class="flex items-center px-3 py-2 text-sm font-medium rounded-md text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary))] hover:text-[hsl(var(--secondary-foreground))]">
-                <i data-lucide="bot" class="mr-3 h-4 w-4"></i> Autonomous Operator
-            </a>
-            <a href="#" class="flex items-center px-3 py-2 text-sm font-medium rounded-md text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary))] hover:text-[hsl(var(--secondary-foreground))]">
-                <i data-lucide="flask-conical" class="mr-3 h-4 w-4"></i> AI Experiments
-            </a>
-        </nav>
-        
-        <!-- User Profile -->
-        <div class="border-t border-[hsl(var(--border))] p-4">
-            <div class="flex items-center w-full">
-                <div class="h-8 w-8 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] flex items-center justify-center text-xs font-bold">
-                    {{ request.user.email|make_list|first|upper }}
-                </div>
-                <div class="ml-3">
-                    <p class="text-sm font-medium">{{ request.user.email }}</p>
-                    <p class="text-xs text-[hsl(var(--muted-foreground))]">Admin</p>
-                </div>
-            </div>
-        </div>
-    </aside>
+<body class="min-h-screen flex">
 
-    <!-- Main Content -->
-    <main class="flex-1 flex flex-col overflow-hidden bg-[hsl(var(--muted))]">
-        <!-- Headerbar -->
-        <header class="h-14 bg-[hsl(var(--background))] border-b border-[hsl(var(--border))] flex items-center justify-between px-4 lg:px-8">
-            <div class="flex items-center">
-                <button class="md:hidden mr-4 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]">
-                    <i data-lucide="menu" class="h-5 w-5"></i>
-                </button>
-                
-                <!-- Search bar -->
-                <div class="relative w-64 md:w-96">
-                    <i data-lucide="search" class="absolute left-2.5 top-2.5 h-4 w-4 text-[hsl(var(--muted-foreground))]"></i>
-                    <input type="text" placeholder="Search orders, products, or ask AI..." class="h-9 w-full rounded-md border border-[hsl(var(--input))] bg-transparent px-3 py-1 pl-9 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-[hsl(var(--muted-foreground))] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--ring))] disabled:cursor-not-allowed disabled:opacity-50">
-                    <div class="absolute right-1 top-1 flex h-7 items-center rounded bg-[hsl(var(--muted))] px-1.5 font-mono text-[10px] font-medium opacity-100"><span class="text-xs">⌘</span>K</div>
-                </div>
-            </div>
-            
-            <div class="flex items-center space-x-4">
-                <button class="h-9 w-9 rounded-md border border-[hsl(var(--input))] inline-flex items-center justify-center text-sm font-medium hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]">
-                    <i data-lucide="bell" class="h-4 w-4"></i>
-                </button>
-            </div>
-        </header>
+<div id="sidebar-backdrop" class="drawer-backdrop md:hidden"></div>
+<aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-[color:var(--bg)] border-r border-[color:var(--border)] flex flex-col -translate-x-full md:translate-x-0 md:static transition-transform duration-200 ease-out">
+  <div class="h-14 flex items-center justify-between px-4 border-b border-[color:var(--border)]">
+    <a href="{% url 'admin_dashboard:home' %}" class="flex items-center gap-2 font-semibold tracking-tight">
+      <i data-lucide="hexagon" class="h-5 w-5"></i>
+      <span>Morpheus</span>
+    </a>
+    <button id="sidebar-close" class="md:hidden btn btn-ghost p-1.5"><i data-lucide="x" class="h-4 w-4"></i></button>
+  </div>
+  <nav class="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+    <a href="{% url 'admin_dashboard:home' %}"      class="nav-link {% if active_nav == 'home' %}active{% endif %}"><i data-lucide="home" class="h-4 w-4"></i> Home</a>
+    <a href="{% url 'admin_dashboard:orders' %}"    class="nav-link {% if active_nav == 'orders' %}active{% endif %}"><i data-lucide="shopping-bag" class="h-4 w-4"></i> Orders</a>
+    <a href="{% url 'admin_dashboard:products' %}"  class="nav-link {% if active_nav == 'products' %}active{% endif %}"><i data-lucide="package" class="h-4 w-4"></i> Products</a>
+    <a href="{% url 'admin_dashboard:customers' %}" class="nav-link {% if active_nav == 'customers' %}active{% endif %}"><i data-lucide="users" class="h-4 w-4"></i> Customers</a>
+    <a href="{% url 'admin_dashboard:marketing' %}" class="nav-link {% if active_nav == 'marketing' %}active{% endif %}"><i data-lucide="megaphone" class="h-4 w-4"></i> Marketing</a>
+    <a href="{% url 'admin_dashboard:analytics' %}" class="nav-link {% if active_nav == 'analytics' %}active{% endif %}"><i data-lucide="bar-chart-2" class="h-4 w-4"></i> Analytics</a>
+    <div class="nav-section">AI &amp; agents</div>
+    <a href="{% url 'admin_dashboard:ai_insights' %}" class="nav-link {% if active_nav == 'ai_insights' %}active{% endif %}"><i data-lucide="sparkles" class="h-4 w-4"></i> Insights</a>
+    <div class="nav-section">Sales channels</div>
+    <a href="#" class="nav-link"><i data-lucide="globe" class="h-4 w-4"></i> Online store</a>
+    <div class="nav-section">Apps &amp; settings</div>
+    <a href="{% url 'admin_dashboard:apps' %}"     class="nav-link {% if active_nav == 'apps' %}active{% endif %}"><i data-lucide="grid-3x3" class="h-4 w-4"></i> Apps</a>
+    <a href="{% url 'admin_dashboard:settings' %}" class="nav-link {% if active_nav == 'settings' %}active{% endif %}"><i data-lucide="settings" class="h-4 w-4"></i> Settings</a>
+  </nav>
+  <div class="border-t border-[color:var(--border)] px-3 py-3">
+    <div class="flex items-center gap-2.5">
+      <div class="h-8 w-8 rounded-full bg-[color:var(--primary)] text-[color:var(--primary-fg)] flex items-center justify-center text-xs font-bold">
+        {{ request.user.email|slice:":1"|upper }}
+      </div>
+      <div class="min-w-0">
+        <p class="text-sm font-medium truncate">{{ request.user.email|default:"Staff" }}</p>
+        <p class="text-xs text-[color:var(--text-muted)]">Admin</p>
+      </div>
+    </div>
+  </div>
+</aside>
 
-        <!-- Page Content -->
-        <div class="flex-1 overflow-y-auto p-4 lg:p-8">
-            {% block content %}{% endblock %}
-        </div>
-    </main>
+<div class="flex-1 flex flex-col min-w-0">
+  <header class="h-14 flex items-center gap-3 px-4 lg:px-6 border-b border-[color:var(--border)] bg-[color:var(--bg)]">
+    <button id="sidebar-open" class="md:hidden btn btn-ghost p-1.5"><i data-lucide="menu" class="h-5 w-5"></i></button>
+    <div class="relative flex-1 max-w-xl">
+      <i data-lucide="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[color:var(--text-subtle)]"></i>
+      <input type="text" placeholder="Search orders, products, customers…" class="input input-search">
+    </div>
+    <a href="{% url 'admin_dashboard:settings' %}" class="btn btn-ghost p-1.5"><i data-lucide="settings" class="h-4 w-4"></i></a>
+    <button class="btn btn-ghost p-1.5"><i data-lucide="bell" class="h-4 w-4"></i></button>
+  </header>
 
-    <script>
-        lucide.createIcons();
-    </script>
+  <main class="flex-1 overflow-y-auto p-4 lg:p-6">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<script>
+  lucide.createIcons();
+  (() => {
+    const sb = document.getElementById('sidebar');
+    const bd = document.getElementById('sidebar-backdrop');
+    const open = () => { sb.classList.remove('-translate-x-full'); bd.classList.add('open'); };
+    const close = () => { sb.classList.add('-translate-x-full'); bd.classList.remove('open'); };
+    document.getElementById('sidebar-open')?.addEventListener('click', open);
+    document.getElementById('sidebar-close')?.addEventListener('click', close);
+    bd.addEventListener('click', close);
+  })();
+</script>
 </body>
 </html>

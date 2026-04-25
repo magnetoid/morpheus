@@ -1,65 +1,79 @@
 {% extends "admin_dashboard/base.html" %}
+{% block title %}Orders · Morpheus{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <div class="flex items-center justify-between">
-        <h1 class="text-3xl font-bold tracking-tight">Orders</h1>
-    </div>
+<div class="max-w-7xl mx-auto space-y-4">
 
-    <div class="card rounded-md border bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow">
-        <div class="p-4 flex items-center gap-4">
-            <div class="relative flex-1 max-w-sm">
-                <i data-lucide="search" class="absolute left-2.5 top-2.5 h-4 w-4 text-[hsl(var(--muted-foreground))]"></i>
-                <input type="text" placeholder="Filter orders..." class="h-9 w-full rounded-md border border-[hsl(var(--input))] bg-transparent px-3 py-1 pl-9 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--ring))]">
-            </div>
-            <div class="flex space-x-2">
-                <button class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-[hsl(var(--input))] bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] h-9 px-4 py-2">All</button>
-                <button class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-[hsl(var(--input))] bg-transparent hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))] h-9 px-4 py-2">Unfulfilled</button>
-                <button class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-[hsl(var(--input))] bg-transparent hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))] h-9 px-4 py-2">Unpaid</button>
-            </div>
-        </div>
-        
-        <div class="relative w-full overflow-auto">
-            <table class="w-full caption-bottom text-sm">
-                <thead class="[&_tr]:border-b border-[hsl(var(--border))]">
-                    <tr class="border-b transition-colors hover:bg-[hsl(var(--muted))]/50 data-[state=selected]:bg-[hsl(var(--muted))]">
-                        <th class="h-12 px-4 text-left align-middle font-medium text-[hsl(var(--muted-foreground))] w-[50px]">
-                            <input type="checkbox" class="h-4 w-4 rounded border-[hsl(var(--primary))] text-[hsl(var(--primary))] focus:ring-[hsl(var(--primary))]">
-                        </th>
-                        <th class="h-12 px-4 text-left align-middle font-medium text-[hsl(var(--muted-foreground))]">Order</th>
-                        <th class="h-12 px-4 text-left align-middle font-medium text-[hsl(var(--muted-foreground))]">Date</th>
-                        <th class="h-12 px-4 text-left align-middle font-medium text-[hsl(var(--muted-foreground))]">Customer</th>
-                        <th class="h-12 px-4 text-left align-middle font-medium text-[hsl(var(--muted-foreground))]">Status</th>
-                        <th class="h-12 px-4 text-right align-middle font-medium text-[hsl(var(--muted-foreground))]">Total</th>
-                    </tr>
-                </thead>
-                <tbody class="[&_tr:last-child]:border-0">
-                    {% for order in data.orders %}
-                    <tr class="border-b border-[hsl(var(--border))] transition-colors hover:bg-[hsl(var(--muted))]/50">
-                        <td class="p-4 align-middle">
-                            <input type="checkbox" class="h-4 w-4 rounded border-[hsl(var(--primary))] text-[hsl(var(--primary))] focus:ring-[hsl(var(--primary))]">
-                        </td>
-                        <td class="p-4 align-middle font-medium">#{{ order.orderNumber }}</td>
-                        <td class="p-4 align-middle text-[hsl(var(--muted-foreground))]">Just now</td>
-                        <td class="p-4 align-middle">Customer</td>
-                        <td class="p-4 align-middle">
-                            <div class="inline-flex items-center rounded-full border border-transparent bg-amber-500/15 text-amber-700 px-2.5 py-0.5 text-xs font-semibold capitalize">{{ order.status }}</div>
-                        </td>
-                        <td class="p-4 align-middle text-right font-medium">{{ order.total.amount }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="p-8 text-center text-[hsl(var(--muted-foreground))]">
-                            <div class="flex flex-col items-center justify-center space-y-3">
-                                <i data-lucide="shopping-bag" class="h-10 w-10 text-[hsl(var(--muted-foreground))]/50"></i>
-                                <div>No orders found.</div>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">Orders</h1>
+      <p class="text-sm text-[color:var(--text-muted)]">Showing the most recent 100.</p>
     </div>
+    <div class="flex items-center gap-2">
+      <button class="btn"><i data-lucide="download" class="h-4 w-4"></i> Export</button>
+      <button class="btn btn-primary"><i data-lucide="plus" class="h-4 w-4"></i> Create order</button>
+    </div>
+  </div>
+
+  <form method="get" class="card card-padded flex flex-wrap gap-2 items-center">
+    <div class="relative flex-1 min-w-[200px]">
+      <i data-lucide="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[color:var(--text-subtle)]"></i>
+      <input name="q" value="{{ search }}" placeholder="Order # or email" class="input input-search">
+    </div>
+    <select name="status" class="input max-w-[180px]">
+      <option value="">All statuses</option>
+      <option value="pending"    {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+      <option value="confirmed"  {% if status_filter == 'confirmed' %}selected{% endif %}>Confirmed</option>
+      <option value="processing" {% if status_filter == 'processing' %}selected{% endif %}>Processing</option>
+      <option value="fulfilled"  {% if status_filter == 'fulfilled' %}selected{% endif %}>Fulfilled</option>
+      <option value="shipped"    {% if status_filter == 'shipped' %}selected{% endif %}>Shipped</option>
+      <option value="delivered"  {% if status_filter == 'delivered' %}selected{% endif %}>Delivered</option>
+      <option value="cancelled"  {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+      <option value="refunded"   {% if status_filter == 'refunded' %}selected{% endif %}>Refunded</option>
+    </select>
+    <button class="btn btn-primary">Apply</button>
+  </form>
+
+  <div class="card overflow-hidden">
+    {% if orders %}
+    <table class="morph-table">
+      <thead>
+        <tr>
+          <th class="w-8"><input type="checkbox" class="rounded border-[color:var(--border)]"></th>
+          <th>Order</th><th>Date</th><th>Customer</th><th>Status</th><th>Payment</th><th class="text-right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in orders %}
+        <tr>
+          <td><input type="checkbox" class="rounded border-[color:var(--border)]"></td>
+          <td><a href="{% url 'admin_dashboard:order_detail' o.order_number %}" class="font-medium hover:underline">#{{ o.order_number }}</a></td>
+          <td class="text-[color:var(--text-muted)] whitespace-nowrap">{{ o.placed_at|date:"M j, Y H:i" }}</td>
+          <td class="text-[color:var(--text-muted)]">{{ o.email|default:o.customer.email|default:"—" }}</td>
+          <td>
+            {% if o.status == 'fulfilled' or o.status == 'delivered' %}<span class="pill pill-success">{{ o.get_status_display }}</span>
+            {% elif o.status == 'pending' or o.status == 'processing' or o.status == 'confirmed' %}<span class="pill pill-warn">{{ o.get_status_display }}</span>
+            {% elif o.status == 'cancelled' or o.status == 'refunded' %}<span class="pill pill-danger">{{ o.get_status_display }}</span>
+            {% else %}<span class="pill pill-neutral">{{ o.get_status_display }}</span>{% endif %}
+          </td>
+          <td>
+            {% if o.payment_status == 'paid' %}<span class="pill pill-success">{{ o.payment_status }}</span>
+            {% elif o.payment_status == 'unpaid' %}<span class="pill pill-warn">{{ o.payment_status }}</span>
+            {% else %}<span class="pill pill-neutral">{{ o.payment_status }}</span>{% endif %}
+          </td>
+          <td class="text-right font-medium">{{ o.total }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="card-padded text-center py-16">
+      <i data-lucide="shopping-bag" class="h-10 w-10 mx-auto mb-3 text-[color:var(--text-subtle)]"></i>
+      <h3 class="font-medium">No orders yet</h3>
+      <p class="text-sm text-[color:var(--text-muted)] mt-1">When customers place orders, they'll appear here.</p>
+    </div>
+    {% endif %}
+  </div>
+
 </div>
 {% endblock %}
