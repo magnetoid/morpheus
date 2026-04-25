@@ -337,19 +337,42 @@ def marketing_view(request: HttpRequest) -> HttpResponse:
 @staff_member_required
 def apps_view(request: HttpRequest) -> HttpResponse:
     from plugins.registry import plugin_registry
+
+    if request.method == 'POST':
+        return _toggle_plugin(request)
+
     plugins = []
     for name, cls in sorted(plugin_registry._classes.items()):
+        instance = plugin_registry.get(name)
         plugins.append({
             'name': name,
             'label': getattr(cls, 'label', name),
             'description': getattr(cls, 'description', ''),
             'version': getattr(cls, 'version', ''),
             'active': plugin_registry.is_active(name),
+            'pages': [p for p in plugin_registry.dashboard_pages() if p.plugin == name],
+            'has_settings': plugin_registry.settings_panel(name) is not None,
         })
     return render(request, 'admin_dashboard/apps.html', {
         'plugins': plugins,
         'active_nav': 'apps',
     })
+
+
+def _toggle_plugin(request: HttpRequest):
+    """POST handler on the apps page: flip a plugin's enabled state in DB."""
+    from django.shortcuts import redirect
+
+    name = request.POST.get('plugin', '').strip()
+    desired = request.POST.get('enabled') == '1'
+    try:
+        from plugins.models import PluginConfig
+        row, _ = PluginConfig.objects.get_or_create(plugin_name=name)
+        row.is_enabled = desired
+        row.save(update_fields=['is_enabled', 'updated_at'])
+    except Exception as e:  # noqa: BLE001 — DB outage shouldn't crash the page
+        logger.warning('admin_dashboard: toggle %s failed: %s', name, e, exc_info=True)
+    return redirect('admin_dashboard:apps')
 
 
 # ── Settings ──────────────────────────────────────────────────────────────────

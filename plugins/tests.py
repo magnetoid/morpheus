@@ -126,3 +126,94 @@ class MorphCreatePluginTests(SimpleTestCase):
         compile(plugin_py, str(out / 'plugin.py'), 'exec')
         graphql_py = (out / 'graphql/queries.py').read_text()
         compile(graphql_py, str(out / 'graphql/queries.py'), 'exec')
+
+
+class PluginContributionTests(SimpleTestCase):
+    """Verify plugin contribution surfaces flow through the registry."""
+
+    def test_plugin_can_contribute_storefront_block(self):
+        from plugins.contributions import StorefrontBlock
+        from plugins.registry import PluginRegistry
+
+        class P(MorpheusPlugin):
+            name = 'sf_block_test'
+            label = 'SF Block Test'
+            version = '0.1.0'
+
+            def contribute_storefront_blocks(self):
+                return [StorefrontBlock(slot='home_below_grid', template='x.html', priority=10)]
+
+        reg = PluginRegistry()
+        instance = P()
+        reg._collect_contributions(instance)
+        blocks = reg.storefront_blocks_for('home_below_grid')
+        self.assertEqual(len(blocks), 1)
+        self.assertEqual(blocks[0].plugin, 'sf_block_test')
+        self.assertEqual(blocks[0].priority, 10)
+
+    def test_plugin_can_contribute_dashboard_page(self):
+        from plugins.contributions import DashboardPage
+        from plugins.registry import PluginRegistry
+
+        class P(MorpheusPlugin):
+            name = 'dash_page_test'
+            label = 'Dash Page Test'
+            version = '0.1.0'
+
+            def contribute_dashboard_pages(self):
+                return [DashboardPage(label='Bulk Edit', slug='bulk', view='x.y.z', icon='edit')]
+
+        reg = PluginRegistry()
+        reg._collect_contributions(P())
+        pages = reg.dashboard_pages()
+        self.assertEqual(len(pages), 1)
+        self.assertEqual(pages[0].plugin, 'dash_page_test')
+        self.assertEqual(pages[0].slug, 'bulk')
+
+    def test_plugin_can_contribute_settings_panel(self):
+        from plugins.contributions import SettingsPanel
+        from plugins.registry import PluginRegistry
+
+        class P(MorpheusPlugin):
+            name = 'settings_panel_test'
+            label = 'Settings Panel Test'
+            version = '0.1.0'
+
+            def get_config_schema(self):
+                return {'type': 'object', 'properties': {'enabled': {'type': 'boolean', 'default': True}}}
+
+            def contribute_settings_panel(self):
+                return SettingsPanel(label='Settings', schema=self.get_config_schema())
+
+        reg = PluginRegistry()
+        reg._collect_contributions(P())
+        panel = reg.settings_panel('settings_panel_test')
+        self.assertIsNotNone(panel)
+        self.assertEqual(panel.plugin, 'settings_panel_test')
+
+    def test_drop_contributions_removes_them(self):
+        from plugins.contributions import StorefrontBlock
+        from plugins.registry import PluginRegistry
+
+        class P(MorpheusPlugin):
+            name = 'drop_test'
+            label = 'Drop Test'
+            version = '0.1.0'
+
+            def contribute_storefront_blocks(self):
+                return [StorefrontBlock(slot='s', template='t.html')]
+
+        reg = PluginRegistry()
+        reg._collect_contributions(P())
+        self.assertEqual(len(reg.storefront_blocks_for('s')), 1)
+        reg._drop_contributions('drop_test')
+        self.assertEqual(len(reg.storefront_blocks_for('s')), 0)
+
+
+class StorefrontBlocksTagTests(SimpleTestCase):
+    """The {% storefront_blocks 'slot' %} tag renders contributed templates."""
+
+    def test_tag_renders_nothing_when_no_blocks(self):
+        from django.template import Context, Template
+        out = Template("{% load morph %}{% storefront_blocks 'no_such_slot' %}").render(Context({}))
+        self.assertEqual(out.strip(), '')

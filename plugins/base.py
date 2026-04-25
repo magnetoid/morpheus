@@ -245,6 +245,37 @@ class MorpheusPlugin:
     def invalidate_config_cache(self) -> None:
         self._config_cache = None
 
+    # ── Contribution surfaces ─────────────────────────────────────────────────
+    #
+    # When the plugin is *enabled*, the registry collects the return values
+    # of these three methods into platform-wide indexes. See
+    # `plugins.contributions` for the dataclass shapes.
+
+    def contribute_storefront_blocks(self) -> list:
+        """Return a list of `StorefrontBlock` instances.
+
+        The active theme decides which `slot` names it actually renders
+        via `{% load morph %}{% storefront_blocks "slot_name" %}`. Empty
+        list = no storefront contributions.
+        """
+        return []
+
+    def contribute_dashboard_pages(self) -> list:
+        """Return a list of `DashboardPage` entries.
+
+        The registry mounts each at `/dashboard/apps/<plugin>/<slug>/` and
+        the dashboard sidebar renders them in their declared `section`.
+        """
+        return []
+
+    def contribute_settings_panel(self):
+        """Return a `SettingsPanel` (or `None`).
+
+        Override to expose this plugin's settings as a merchant-editable
+        form on `/dashboard/apps/<plugin>/settings/`.
+        """
+        return None
+
     # ── Info ──────────────────────────────────────────────────────────────────
 
     def __repr__(self) -> str:
