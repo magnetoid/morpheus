@@ -3,8 +3,8 @@ name: cd
 on:
   workflow_dispatch:
   push:
-    tags:
-      - "v*"
+    branches: ["main"]
+    tags: ["v*"]
 
 jobs:
   build-and-push:
@@ -25,6 +25,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/morpheus-web:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/morpheus-web:latest
-
+            ghcr.io/${{ github.repository_owner }}/morpheus:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/morpheus:latest
