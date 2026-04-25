@@ -8,9 +8,18 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config('SECRET_KEY', default='dev-secret-key-change-this-in-production-abc123')
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config('DEBUG', default=False, cast=bool)
+SECRET_KEY = config(
+    'SECRET_KEY',
+    default='dev-secret-key-change-this-in-production-abc123' if DEBUG else '',
+)
+if not SECRET_KEY:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured("SECRET_KEY must be set when DEBUG=False")
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+if not DEBUG and ALLOWED_HOSTS == ['localhost', '127.0.0.1']:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured("ALLOWED_HOSTS must be set explicitly when DEBUG=False")
 
 # ── Plugin & Theme directories ─────────────────────────────────────────────────
 MORPHEUS_PLUGINS_DIR = BASE_DIR / 'plugins' / 'installed'
@@ -30,6 +39,12 @@ MORPHEUS_DEFAULT_PLUGINS = [
     'plugins.installed.admin_dashboard',
     'plugins.installed.ai_assistant',
     'plugins.installed.ai_content',
+    'plugins.installed.functions',
+    'plugins.installed.importers',
+    'plugins.installed.observability',
+    'plugins.installed.environments',
+    'plugins.installed.affiliates',
+    'plugins.installed.marketplace',
 ]
 
 # ── Extra plugins installed by merchant via .env ───────────────────────────────
@@ -99,6 +114,9 @@ MIDDLEWARE = [
     'plugins.middleware.PluginMiddleware',
     'themes.middleware.ThemeMiddleware',
     'plugins.installed.ai_assistant.middleware.AIContextMiddleware',
+    'api.permissions.AgentAuthMiddleware',
+    'api.rate_limit.RateLimitMiddleware',
+    'plugins.installed.environments.middleware.EnvironmentMiddleware',
 ]
 
 ROOT_URLCONF = 'morph.urls'
@@ -138,10 +156,21 @@ DATABASES = {
     )
 }
 
+# Optional: Add read-replica for enterprise scaling
+REPLICA_DB_URL = config('REPLICA_DATABASE_URL', default='')
+if REPLICA_DB_URL:
+    DATABASES['replica'] = dj_database_url.config(
+        default=REPLICA_DB_URL,
+        conn_max_age=600,
+    )
+
+DATABASE_ROUTERS = ['core.db_router.PrimaryReplicaRouter']
+
 # Supabase requires SSL on all PostgreSQL connections
-if DATABASES['default'].get('ENGINE') == 'django.db.backends.postgresql':
-    DATABASES['default'].setdefault('OPTIONS', {})
-    DATABASES['default']['OPTIONS']['sslmode'] = 'require'
+for db_name in DATABASES:
+    if DATABASES[db_name].get('ENGINE') == 'django.db.backends.postgresql':
+        DATABASES[db_name].setdefault('OPTIONS', {})
+        DATABASES[db_name]['OPTIONS']['sslmode'] = 'require'
 
 # ── Auth ───────────────────────────────────────────────────────────────────────
 AUTH_USER_MODEL = 'customers.Customer'
@@ -168,20 +197,40 @@ AUTH_PASSWORD_VALIDATORS = [
 # ── Cache & Celery ─────────────────────────────────────────────────────────────
 REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
 
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': REDIS_URL,
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+import sys as _sys
+
+_RUNNING_TESTS = 'test' in _sys.argv or 'pytest' in _sys.argv[0]
+
+if _RUNNING_TESTS:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'morpheus-tests',
         }
     }
-}
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'IGNORE_EXCEPTIONS': True,
+            },
+        }
+    }
+    DJANGO_REDIS_IGNORE_EXCEPTIONS = True
 
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'
+CELERY_TASK_TIME_LIMIT = 300          # hard kill after 5 min
+CELERY_TASK_SOFT_TIME_LIMIT = 240     # raise SoftTimeLimitExceeded after 4 min
+CELERY_TASK_ACKS_LATE = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 4
 CELERY_BEAT_SCHEDULE = {}  # populated by plugins via plugin.ready()
 
 # ── Static & Media ─────────────────────────────────────────────────────────────
@@ -225,20 +274,35 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
+    # ViewSets that expose public-readable resources (e.g. catalog) opt out
+    # explicitly with `permission_classes = [AllowAny]`. Everything else
+    # requires authentication by default.
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 24,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': config('DRF_THROTTLE_ANON', default='100/hour'),
+        'user': config('DRF_THROTTLE_USER', default='1000/hour'),
+    },
 }
 
 # ── CORS ───────────────────────────────────────────────────────────────────────
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://127.0.0.1:3000',
-    cast=Csv()
-)
+_default_cors = 'http://localhost:3000,http://127.0.0.1:3000' if DEBUG else ''
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default=_default_cors, cast=Csv())
+if not DEBUG and not CORS_ALLOWED_ORIGINS:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured("CORS_ALLOWED_ORIGINS must be set when DEBUG=False")
 CORS_ALLOW_CREDENTIALS = True
+
+# ── GraphQL hardening ─────────────────────────────────────────────────────────
+GRAPHQL_MAX_QUERY_DEPTH = config('GRAPHQL_MAX_QUERY_DEPTH', default=10, cast=int)
+GRAPHQL_MAX_ALIASES = config('GRAPHQL_MAX_ALIASES', default=15, cast=int)
 
 # ── Crispy Forms ───────────────────────────────────────────────────────────────
 CRISPY_ALLOWED_TEMPLATE_PACKS = 'bootstrap5'

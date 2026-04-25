@@ -2,9 +2,10 @@
 Morpheus CMS — Plugin Registry
 Discovers, validates, loads, and manages the lifecycle of all plugins.
 """
+from __future__ import annotations
+
 import importlib
 import logging
-from pathlib import Path
 from typing import Type
 
 from plugins.base import MorpheusPlugin
@@ -17,19 +18,20 @@ class PluginRegistry:
     Central registry for all Morph plugins.
 
     Responsibilities:
-    - Discover plugin classes from plugins/installed/
-    - Validate dependency graph
-    - Two-tier activation: INSTALLED_APPS (models) + behavioral (hooks/URLs/GQL)
-    - Aggregate GraphQL extensions for schema assembly
-    - Aggregate plugin URL patterns
+    - Discover plugin classes from `plugins/installed/`.
+    - Validate the dependency graph (`requires`/`conflicts`).
+    - Activate plugins in topologically-sorted order so dependencies are
+      ready before dependents call `ready()`.
+    - Aggregate GraphQL extensions for schema assembly.
+    - Aggregate plugin URL patterns.
     """
 
-    def __init__(self):
-        self._plugins: dict[str, MorpheusPlugin] = {}          # name → instance
-        self._classes: dict[str, Type[MorpheusPlugin]] = {}    # name → class
-        self._active: set[str] = set()                      # behaviorally active plugins
-        self._graphql_extensions: list[str] = []            # module paths
-        self._plugin_urls: list[dict] = []                  # {urlconf, prefix, namespace}
+    def __init__(self) -> None:
+        self._plugins: dict[str, MorpheusPlugin] = {}
+        self._classes: dict[str, Type[MorpheusPlugin]] = {}
+        self._active: set[str] = set()
+        self._graphql_extensions: list[str] = []
+        self._plugin_urls: list[dict] = []
         self._task_modules: list[str] = []
         self._context_processors: list = []
         self._ready = False
@@ -37,23 +39,18 @@ class PluginRegistry:
     # ── Discovery ──────────────────────────────────────────────────────────────
 
     def discover(self, plugin_module_paths: list[str]) -> None:
-        """
-        Import each plugin module path and register the MorpheusPlugin subclass found.
-        Called from settings.py before Django app registry is ready.
-        """
         for module_path in plugin_module_paths:
             try:
-                plugin_module_path = f"{module_path}.plugin"
-                mod = importlib.import_module(plugin_module_path)
-                plugin_class = self._find_plugin_class(mod, module_path)
-                if plugin_class:
-                    self._classes[plugin_class.name] = plugin_class
-                    logger.debug(f"Discovered plugin: {plugin_class.name} ({module_path})")
-            except Exception as e:
-                logger.error(f"Failed to discover plugin {module_path}: {e}", exc_info=True)
+                mod = importlib.import_module(f"{module_path}.plugin")
+            except ImportError as e:
+                logger.error("Failed to import plugin %s: %s", module_path, e, exc_info=True)
+                continue
+            plugin_class = self._find_plugin_class(mod, module_path)
+            if plugin_class:
+                self._classes[plugin_class.name] = plugin_class
+                logger.debug("Discovered plugin: %s (%s)", plugin_class.name, module_path)
 
     def _find_plugin_class(self, module, module_path: str) -> Type[MorpheusPlugin] | None:
-        """Find the MorpheusPlugin subclass in a module."""
         for attr_name in dir(module):
             obj = getattr(module, attr_name)
             if (
@@ -63,17 +60,13 @@ class PluginRegistry:
                 and obj.name
             ):
                 return obj
-        logger.warning(f"No MorpheusPlugin subclass found in {module_path}.plugin")
+        logger.warning("No MorpheusPlugin subclass found in %s.plugin", module_path)
         return None
 
     # ── Validation ────────────────────────────────────────────────────────────
 
     def validate(self) -> list[str]:
-        """
-        Validate the dependency graph of all discovered plugins.
-        Returns list of error messages (empty = all good).
-        """
-        errors = []
+        errors: list[str] = []
         for name, cls in self._classes.items():
             for dep in cls.requires:
                 if dep not in self._classes:
@@ -83,21 +76,63 @@ class PluginRegistry:
                     errors.append(
                         f"Plugin '{name}' conflicts with '{conflict}' — both are installed."
                     )
+        try:
+            self._topo_sort(list(self._classes.keys()))
+        except ValueError as e:
+            errors.append(str(e))
         return errors
+
+    def _topo_sort(self, names: list[str]) -> list[str]:
+        """Topologically order plugin names by `requires` (Kahn's algorithm)."""
+        from collections import deque
+
+        in_degree: dict[str, int] = {n: 0 for n in names}
+        edges: dict[str, list[str]] = {n: [] for n in names}
+        for name in names:
+            cls = self._classes[name]
+            for dep in cls.requires:
+                if dep not in in_degree:
+                    continue
+                edges[dep].append(name)
+                in_degree[name] += 1
+
+        # Stable order: feed the queue alphabetically so activation order is deterministic.
+        queue = deque(sorted(n for n in names if in_degree[n] == 0))
+        ordered: list[str] = []
+        while queue:
+            n = queue.popleft()
+            ordered.append(n)
+            for child in sorted(edges[n]):
+                in_degree[child] -= 1
+                if in_degree[child] == 0:
+                    queue.append(child)
+
+        if len(ordered) != len(names):
+            cycle = [n for n, deg in in_degree.items() if deg > 0]
+            raise ValueError(f"Circular plugin dependency detected among: {cycle}")
+        return ordered
 
     # ── Activation ────────────────────────────────────────────────────────────
 
     def activate_all(self) -> None:
-        """
-        Behaviorally activate all plugins that are enabled in the DB.
-        Called from AppConfig.ready() after Django is fully loaded.
-        """
         if self._ready:
             return
 
+        errors = self.validate()
+        if errors:
+            for err in errors:
+                logger.error("Plugin validation error: %s", err)
+
+        try:
+            order = self._topo_sort(list(self._classes.keys()))
+        except ValueError as e:
+            logger.error("%s — falling back to alphabetical order.", e)
+            order = sorted(self._classes.keys())
+
         enabled_names = self._get_enabled_from_db()
 
-        for name, cls in self._classes.items():
+        for name in order:
+            cls = self._classes[name]
             instance = cls()
             instance._registry = self
             self._plugins[name] = instance
@@ -106,46 +141,64 @@ class PluginRegistry:
                 self._activate(instance)
 
         self._ready = True
-        logger.info(f"Plugin system ready. Active: {sorted(self._active)}")
+        logger.info("Plugin system ready. Active: %s", sorted(self._active))
 
     def _activate(self, plugin: MorpheusPlugin) -> None:
-        """Activate a single plugin — call ready() and mark active."""
         try:
             plugin.ready()
-            self._active.add(plugin.name)
-            logger.info(f"Plugin activated: {plugin.name} v{plugin.version}")
-        except Exception as e:
-            logger.error(f"Failed to activate plugin {plugin.name}: {e}", exc_info=True)
+        except Exception as e:  # noqa: BLE001 — bad plugin must not bring down the app
+            logger.error("Failed to activate plugin %s: %s", plugin.name, e, exc_info=True)
+            return
+        self._active.add(plugin.name)
+        logger.info("Plugin activated: %s v%s", plugin.name, plugin.version)
 
     def deactivate(self, name: str) -> None:
-        """Deactivate a plugin — call on_disable() and update DB."""
         if name in self._plugins and name in self._active:
             self._plugins[name].on_disable()
             self._active.discard(name)
             self._update_db_status(name, enabled=False)
-            logger.info(f"Plugin deactivated: {name}")
+            logger.info("Plugin deactivated: %s", name)
 
     def _get_enabled_from_db(self) -> set[str]:
-        """Get set of behaviorally enabled plugin names from DB."""
+        from django.db import DatabaseError
         try:
             from plugins.models import PluginConfig
-            return set(
-                PluginConfig.objects.filter(is_enabled=True).values_list('plugin_name', flat=True)
+            existing_rows = list(
+                PluginConfig.objects.values_list('plugin_name', 'is_enabled')
             )
-        except Exception:
-            # DB not ready yet (first run) — activate all discovered plugins
-            logger.warning("Could not read PluginConfig from DB — activating all discovered plugins.")
+        except (DatabaseError, ImportError, LookupError):
+            logger.warning('PluginConfig table unavailable — activating all discovered plugins.')
             return set(self._classes.keys())
 
+        existing_names = {name for name, _ in existing_rows}
+        enabled = {name for name, is_enabled in existing_rows if is_enabled}
+
+        # Newly discovered plugins (not yet in DB) default to enabled. Write a
+        # row so they show up in the merchant admin and can be toggled later.
+        new_names = set(self._classes.keys()) - existing_names
+        if new_names:
+            try:
+                from plugins.models import PluginConfig
+                PluginConfig.objects.bulk_create(
+                    [PluginConfig(plugin_name=n, is_enabled=True) for n in new_names],
+                    ignore_conflicts=True,
+                )
+                enabled |= new_names
+                logger.info('plugins: auto-enabled %s on first run', sorted(new_names))
+            except DatabaseError as e:
+                logger.warning('plugins: could not register new PluginConfig rows: %s', e)
+
+        return enabled
+
     def _update_db_status(self, name: str, enabled: bool) -> None:
+        from django.db import DatabaseError
         try:
             from plugins.models import PluginConfig
             PluginConfig.objects.update_or_create(
-                plugin_name=name,
-                defaults={'is_enabled': enabled},
+                plugin_name=name, defaults={'is_enabled': enabled},
             )
-        except Exception as e:
-            logger.error(f"Failed to update DB status for plugin {name}: {e}")
+        except (DatabaseError, ImportError) as e:
+            logger.error("Failed to update DB status for plugin %s: %s", name, e)
 
     # ── Registration (called by plugin.ready()) ────────────────────────────────
 
@@ -166,32 +219,23 @@ class PluginRegistry:
     # ── GraphQL schema assembly ────────────────────────────────────────────────
 
     def get_graphql_extensions(self, extension_type: str) -> list[type]:
-        """
-        Collect Query/Mutation mixin classes from all registered GQL modules.
-        extension_type: 'query' | 'mutation'
-        """
-        bases = []
-        attr_map = {'query': 'StorefrontQuery', 'mutation': 'StorefrontMutation'}
+        bases: list[type] = []
+        suffix = extension_type.capitalize() + 'Extension'
         for module_path in self._graphql_extensions:
             try:
                 mod = importlib.import_module(module_path)
-                # Plugins expose StoreQuery/StoreMutation or plugin-specific names
-                for attr in dir(mod):
-                    obj = getattr(mod, attr)
-                    if (
-                        isinstance(obj, type)
-                        and attr.endswith(extension_type.capitalize() + 'Extension')
-                        and obj not in bases
-                    ):
-                        bases.append(obj)
-            except Exception as e:
-                logger.error(f"Failed to load GQL extension {module_path}: {e}", exc_info=True)
+            except ImportError as e:
+                logger.error("Failed to load GQL extension %s: %s", module_path, e, exc_info=True)
+                continue
+            for attr in dir(mod):
+                obj = getattr(mod, attr)
+                if isinstance(obj, type) and attr.endswith(suffix) and obj not in bases:
+                    bases.append(obj)
         return bases
 
     # ── URL aggregation ───────────────────────────────────────────────────────
 
     def get_urlpatterns(self):
-        """Return aggregated URL patterns from all active plugins."""
         from django.urls import include, path
         patterns = []
         for entry in self._plugin_urls:
@@ -199,11 +243,11 @@ class PluginRegistry:
                 patterns.append(
                     path(
                         entry['prefix'],
-                        include((entry['urlconf'], entry['namespace']))
+                        include((entry['urlconf'], entry['namespace'])),
                     )
                 )
-            except Exception as e:
-                logger.error(f"Failed to include URLs {entry}: {e}")
+            except Exception as e:  # noqa: BLE001 — log misconfigured URLs, keep app booting
+                logger.error("Failed to include URLs %s: %s", entry, e)
         return patterns
 
     # ── Accessors ─────────────────────────────────────────────────────────────
@@ -220,9 +264,8 @@ class PluginRegistry:
     def active_plugins(self) -> list[MorpheusPlugin]:
         return [p for p in self._plugins.values() if p.name in self._active]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<PluginRegistry: {len(self._plugins)} plugins, {len(self._active)} active>"
 
 
-# Global singleton
 plugin_registry = PluginRegistry()

@@ -1,7 +1,15 @@
 import strawberry
 from typing import Optional, List
+from datetime import datetime
 import strawberry_django
 from plugins.installed.catalog import models
+
+
+@strawberry.type
+class ImageType:
+    url: str
+    alt_text: Optional[str] = None
+    is_primary: Optional[bool] = None
 
 @strawberry_django.type(models.Category)
 class CategoryType:
@@ -10,6 +18,12 @@ class CategoryType:
     slug: str = strawberry.field(description="URL-safe identifier for deep linking")
     description: str = strawberry.field(description="Category description text")
     is_active: bool = strawberry.field(description="Whether this category is active")
+
+    @strawberry.field
+    def image(self) -> Optional[ImageType]:
+        if not self.image:
+            return None
+        return ImageType(url=self.image.url, alt_text=self.name)
 
 @strawberry_django.type(models.AttributeGroup)
 class AttributeGroupType:
@@ -34,6 +48,20 @@ class AttributeValueType:
     value: str
 
 from core.graphql.types import MoneyType
+
+@strawberry_django.type(models.Collection)
+class CollectionType:
+    id: strawberry.ID
+    name: str
+    slug: str
+    description: str
+    is_featured: bool
+    
+    @strawberry.field
+    def image(self) -> Optional[ImageType]:
+        if not self.image:
+            return None
+        return ImageType(url=self.image.url, alt_text=self.name)
 
 @strawberry_django.type(models.ProductVariant)
 class ProductVariantType:
@@ -61,6 +89,33 @@ class ProductType:
     is_featured: bool = strawberry.field(description="Whether this product is featured")
     category: Optional[CategoryType] = strawberry.field(description="Primary category")
     variants: List[ProductVariantType] = strawberry.field(description="Available variants if variable product")
+    is_on_sale: bool = strawberry.field(description="Whether the product is currently on sale")
+    discount_percentage: int = strawberry.field(description="Discount percentage if on sale")
+    average_rating: Optional[float] = strawberry.field(description="Average rating from reviews")
+
+    @strawberry.field(description="Primary product image")
+    def primary_image(self) -> Optional[ImageType]:
+        img = self.primary_image
+        if not img or not img.image:
+            return None
+        return ImageType(url=img.image.url, alt_text=img.alt_text or self.name, is_primary=img.is_primary)
+
+    @strawberry.field(description="All product images")
+    def images(self) -> List[ImageType]:
+        images = []
+        for img in self.images.all():
+            if not img.image:
+                continue
+            images.append(ImageType(url=img.image.url, alt_text=img.alt_text or self.name, is_primary=img.is_primary))
+        return images
+
+    @strawberry.field(description="Product tags")
+    def tags(self) -> List[str]:
+        return [t.name for t in self.tags.all()]
+
+    @strawberry.field(description="Approved product reviews")
+    def reviews(self) -> List['ReviewType']:
+        return list(self.reviews.filter(is_approved=True))
 
     @strawberry.field(description="Base price of the product")
     def price(self) -> MoneyType:
@@ -71,3 +126,65 @@ class ProductType:
         if not self.compare_at_price:
             return None
         return MoneyType(amount=str(self.compare_at_price.amount), currency=str(self.compare_at_price.currency))
+
+    @strawberry.field(
+        description=(
+            "Agent-readable metadata: structured returns/sizing/availability/"
+            "shipping/policies. Designed for AI shopping agents (ChatGPT, MCP, A2A) "
+            "so they don't have to scrape the product page."
+        )
+    )
+    def agent_metadata(self) -> 'AgentProductMetadata':
+        from plugins.installed.catalog.graphql.types import AgentProductMetadata
+
+        primary = self.primary_image
+        primary_image_url = primary.image.url if primary and primary.image else ''
+        return AgentProductMetadata(
+            id=str(self.id),
+            sku=self.sku or '',
+            name=self.name,
+            currency=str(self.price.currency) if self.price else 'USD',
+            price_amount=str(self.price.amount) if self.price else '0.00',
+            in_stock=any(v.is_active for v in self.variants.all()) or self.product_type == 'simple',
+            requires_shipping=bool(self.requires_shipping),
+            is_digital=self.product_type == 'digital',
+            primary_image_url=primary_image_url,
+            category_slug=self.category.slug if self.category_id else '',
+            tags=[t.name for t in self.tags.all()],
+            url_path=f'/p/{self.slug}',
+        )
+
+
+@strawberry.type
+class AgentProductMetadata:
+    """Stable, machine-friendly view of a product for AI agents."""
+    id: strawberry.ID
+    sku: str
+    name: str
+    currency: str
+    price_amount: str
+    in_stock: bool
+    requires_shipping: bool
+    is_digital: bool
+    primary_image_url: str
+    category_slug: str
+    tags: List[str]
+    url_path: str
+
+
+@strawberry.type
+class ReviewCustomerType:
+    full_name: str
+
+
+@strawberry_django.type(models.Review)
+class ReviewType:
+    id: strawberry.ID
+    rating: int
+    title: str
+    body: str
+    created_at: datetime
+
+    @strawberry.field
+    def customer(self) -> ReviewCustomerType:
+        return ReviewCustomerType(full_name=self.customer.full_name)

@@ -46,39 +46,22 @@ class HookRegistry:
         Also dispatches asynchronous HTTP webhooks to Remote Plugins.
         Returns list of non-None return values from handlers.
         """
-        results = []
-        
-        # 1. Dispatch Webhooks (Remote Plugins)
-        # We wrap this in a try-except because apps aren't ready during initial module import
-        try:
-            from core.models import WebhookEndpoint
-            from core.tasks import dispatch_webhook
-            import json
-            
-            # Serialize payload (simplified for MVP)
-            # In production, we need a robust JSON serializer that handles Model instances
-            payload = {k: str(v) if hasattr(v, 'id') else v for k, v in kwargs.items() if isinstance(v, (str, int, float, bool, dict, list))}
-            
-            # We would normally filter WebhookEndpoints by 'events' JSONField containing 'event'
-            endpoints = WebhookEndpoint.objects.filter(is_active=True)
-            for endpoint in endpoints:
-                if event in endpoint.events or '*' in endpoint.events:
-                    dispatch_webhook.delay(endpoint.url, endpoint.secret, event, payload)
-        except Exception as e:
-            logger.debug(f"Webhook dispatch skipped or failed: {e}")
+        results: list[Any] = []
 
-        # 2. Local Handlers (Native Plugins)
-        for priority, handler in self._handlers.get(event, []):
+        self._dispatch_remote(event, kwargs)
+
+        for _priority, handler in self._handlers.get(event, []):
             try:
                 result = handler(**kwargs)
-                if result is not None:
-                    results.append(result)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — handler isolation, logged with traceback
                 logger.error(
-                    f"Hook handler error: event={event} handler={handler.__qualname__} "
-                    f"error={e}",
+                    "Hook handler error: event=%s handler=%s error=%s",
+                    event, handler.__qualname__, e,
                     exc_info=True,
                 )
+                continue
+            if result is not None:
+                results.append(result)
         return results
 
     def filter(self, event: str, value: Any, **kwargs: Any) -> Any:
@@ -86,18 +69,84 @@ class HookRegistry:
         Filter an event — each handler receives the (potentially modified) value
         and returns a new value. Builds a transformation pipeline.
         """
-        for priority, handler in self._handlers.get(event, []):
+        for _priority, handler in self._handlers.get(event, []):
             try:
                 result = handler(value=value, **kwargs)
-                if result is not None:
-                    value = result
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — filter isolation, logged with traceback
                 logger.error(
-                    f"Hook filter error: event={event} handler={handler.__qualname__} "
-                    f"error={e}",
+                    "Hook filter error: event=%s handler=%s error=%s",
+                    event, handler.__qualname__, e,
                     exc_info=True,
                 )
+                continue
+            if result is not None:
+                value = result
         return value
+
+    # ── Internal helpers ───────────────────────────────────────────────────────
+
+    @staticmethod
+    def _serialize_payload(kwargs: dict[str, Any]) -> dict[str, Any]:
+        import decimal
+        import json as _json
+        from django.core.serializers.json import DjangoJSONEncoder
+        from django.db import models
+        from django.db.models.query import QuerySet
+
+        class WebhookEncoder(DjangoJSONEncoder):
+            def default(self, o):
+                if isinstance(o, models.Model):
+                    return {'id': str(o.pk), 'model': o.__class__.__name__}
+                if isinstance(o, QuerySet):
+                    return [
+                        {'id': str(obj.pk), 'model': obj.__class__.__name__}
+                        for obj in o
+                    ]
+                if isinstance(o, decimal.Decimal):
+                    return str(o)
+                if hasattr(o, 'amount') and hasattr(o, 'currency'):  # MoneyField
+                    return {'amount': str(o.amount), 'currency': str(o.currency)}
+                return super().default(o)
+
+        return _json.loads(_json.dumps(kwargs, cls=WebhookEncoder))
+
+    def _dispatch_remote(self, event: str, kwargs: dict[str, Any]) -> None:
+        """
+        Serialize the event payload and dispatch to (a) any subscribed
+        WebhookEndpoints via Celery and (b) the transactional outbox for the
+        NATS publisher. Designed to fail-soft: a broken webhook config must
+        never break local handlers.
+        """
+        try:
+            from django.apps import apps
+            if not apps.ready:
+                return
+            from core.models import OutboxEvent, WebhookEndpoint
+            from core.tasks import dispatch_webhook
+        except ImportError as e:  # apps not loaded yet (e.g. during settings import)
+            logger.debug("Skipping remote dispatch for %s — apps not ready: %s", event, e)
+            return
+
+        try:
+            payload = self._serialize_payload(kwargs)
+        except (TypeError, ValueError) as e:
+            logger.error(
+                "Failed to serialize payload for event=%s: %s", event, e, exc_info=True,
+            )
+            return
+
+        try:
+            endpoints = WebhookEndpoint.objects.filter(is_active=True)
+            for endpoint in endpoints:
+                if event in endpoint.events or '*' in endpoint.events:
+                    dispatch_webhook.delay(endpoint.url, endpoint.secret, event, payload)
+        except Exception as e:  # noqa: BLE001 — DB outage must not break local handlers
+            logger.warning("Webhook dispatch failed for %s: %s", event, e, exc_info=True)
+
+        try:
+            OutboxEvent.objects.create(event_type=event, payload=payload)
+        except Exception as e:  # noqa: BLE001 — outbox failure logged, do not abort
+            logger.warning("Outbox write failed for %s: %s", event, e, exc_info=True)
 
     def has_handlers(self, event: str) -> bool:
         return bool(self._handlers.get(event))

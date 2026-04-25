@@ -11,7 +11,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('api.urls')),          # GraphQL at /graphql/
     path('accounts/', include('allauth.urls')),
-    path('plugins/', include('plugins.urls')),
+    path('', include('plugins.urls')),
 ]
 
 if settings.DEBUG:

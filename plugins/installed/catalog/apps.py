@@ -9,5 +9,6 @@ class CatalogConfig(AppConfig):
     def ready(self):
         from plugins.registry import plugin_registry
         from plugins.installed.catalog.plugin import CatalogPlugin
+        import plugins.installed.catalog.signals
         if 'catalog' not in plugin_registry._classes:
             plugin_registry._classes['catalog'] = CatalogPlugin

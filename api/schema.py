@@ -1,9 +1,21 @@
 """
-Morpheus CMS — GraphQL Schema Assembly
-Dynamically assembled from core types + all active plugin extensions.
+Morpheus CMS — GraphQL Schema Assembly.
+
+Schema is composed from CoreQuery/CoreMutation plus every extension module
+registered by an active plugin. Built once at process start (driven from
+`api.apps.ApiConfig.ready()`), then served from a process-local cache.
 """
-import strawberry
+from __future__ import annotations
+
+import importlib
 import logging
+import threading
+from typing import Optional
+
+import strawberry
+from strawberry.extensions import SchemaExtension
+
+from api.graphql_permissions import PermissionDenied
 
 logger = logging.getLogger('morpheus.api')
 
@@ -31,10 +43,25 @@ class CoreMutation:
         return "pong"
 
 
-def build_schema():
-    """Build the root schema by assembling core + all plugin extensions."""
+class _PermissionToGraphQLError(SchemaExtension):
+    """Map our PermissionDenied to a structured GraphQL error response."""
+
+    def on_executing_end(self) -> None:  # type: ignore[override]
+        result = self.execution_context.result
+        if not result or not result.errors:
+            return
+        for err in result.errors:
+            original = getattr(err, 'original_error', None)
+            if isinstance(original, PermissionDenied):
+                err.message = str(original) or 'Permission denied'
+                if err.extensions is None:
+                    err.extensions = {}
+                err.extensions['code'] = 'PERMISSION_DENIED'
+
+
+def build_schema() -> strawberry.Schema:
+    """Assemble the schema from core types + all plugin extension modules."""
     from plugins.registry import plugin_registry
-    import importlib
 
     query_bases = [CoreQuery]
     mutation_bases = [CoreMutation]
@@ -42,38 +69,49 @@ def build_schema():
     for module_path in plugin_registry._graphql_extensions:
         try:
             mod = importlib.import_module(module_path)
-            for attr_name in dir(mod):
-                obj = getattr(mod, attr_name)
-                if not isinstance(obj, type):
-                    continue
-                if attr_name.endswith('QueryExtension') and obj not in query_bases:
-                    query_bases.append(obj)
-                elif attr_name.endswith('MutationExtension') and obj not in mutation_bases:
-                    mutation_bases.append(obj)
-        except Exception as e:
-            logger.error(f"Failed to load GraphQL extension {module_path}: {e}", exc_info=True)
+        except ImportError as e:
+            logger.error("Failed to import GraphQL extension %s: %s", module_path, e, exc_info=True)
+            continue
+        for attr_name in dir(mod):
+            obj = getattr(mod, attr_name)
+            if not isinstance(obj, type):
+                continue
+            if attr_name.endswith('QueryExtension') and obj not in query_bases:
+                query_bases.append(obj)
+            elif attr_name.endswith('MutationExtension') and obj not in mutation_bases:
+                mutation_bases.append(obj)
 
     @strawberry.type
-    class Query(*query_bases):
+    class Query(*query_bases):  # type: ignore[misc]
         pass
 
     @strawberry.type
-    class Mutation(*mutation_bases):
+    class Mutation(*mutation_bases):  # type: ignore[misc]
         pass
 
-    return strawberry.Schema(query=Query, mutation=Mutation)
+    return strawberry.Schema(
+        query=Query,
+        mutation=Mutation,
+        extensions=[_PermissionToGraphQLError],
+    )
 
-
-import threading
 
 _schema_lock = threading.Lock()
-_cached_schema = None
+_cached_schema: Optional[strawberry.Schema] = None
 
-def get_schema():
+
+def get_schema() -> strawberry.Schema:
     global _cached_schema
     if _cached_schema is None:
         with _schema_lock:
-            # Double-checked locking
             if _cached_schema is None:
                 _cached_schema = build_schema()
     return _cached_schema
+
+
+def warm_schema() -> None:
+    """Pre-build the schema to remove first-request latency."""
+    try:
+        get_schema()
+    except Exception as e:  # noqa: BLE001 — must not block app startup
+        logger.error("Failed to pre-build GraphQL schema: %s", e, exc_info=True)

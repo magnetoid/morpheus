@@ -33,11 +33,13 @@ class StoreSettings(models.Model):
 
     @classmethod
     def get(cls, key: str, default=None):
+        from django.db import DatabaseError
         try:
             obj = cls.objects.first()
-            return getattr(obj, key, default) if obj else default
-        except Exception:
+        except DatabaseError:
+            # DB unavailable (e.g. migrations not yet applied) — degrade gracefully.
             return default
+        return getattr(obj, key, default) if obj else default
 
 class StoreChannel(models.Model):
     """
@@ -91,3 +93,27 @@ class WebhookEndpoint(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.url})"
+
+class OutboxEvent(models.Model):
+    """
+    Implements the Transactional Outbox pattern.
+    Events are written here in the same DB transaction as domain mutations.
+    A separate worker reads these and publishes to NATS/Kafka.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    event_type = models.CharField(max_length=255, db_index=True)
+    payload = models.JSONField()
+    status = models.CharField(max_length=20, default='PENDING', choices=[
+        ('PENDING', 'Pending'),
+        ('PUBLISHED', 'Published'),
+        ('FAILED', 'Failed')
+    ], db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.event_type} - {self.status}"

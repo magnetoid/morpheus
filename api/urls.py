@@ -1,9 +1,11 @@
 """
-Morpheus CMS — API URLs (versioned)
+Morpheus CMS — API URLs (versioned).
 """
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from api.rest import ProductViewSet, CategoryViewSet, OrderViewSet
+
+from api import views
+from api.rest import CategoryViewSet, OrderViewSet, ProductViewSet
 
 router = DefaultRouter()
 router.register(r'products', ProductViewSet, basename='product')
@@ -11,16 +13,15 @@ router.register(r'categories', CategoryViewSet, basename='category')
 router.register(r'orders', OrderViewSet, basename='order')
 
 
-def graphql_view():
-    from strawberry.django.views import GraphQLView
-    from api.schema import get_schema
-    return GraphQLView.as_view(schema=get_schema())
+def graphql_view(agent_only: bool = False):
+    from api.graphql_view import morpheus_graphql_view
+    return morpheus_graphql_view(agent_only=agent_only)
 
 
 urlpatterns = [
+    path('healthz', views.healthz, name='healthz'),
+    path('readyz', views.readyz, name='readyz'),
     path('graphql/', graphql_view(), name='graphql'),
-    # REST is versioned — allows us to ship /v2/ without breaking existing clients
+    path('graphql/agent/', graphql_view(agent_only=True), name='graphql_agent'),
     path('v1/', include(router.urls)),
-    # Keep legacy /rest/ alias for backward compat during transition
-    path('rest/', include(router.urls)),
 ]
