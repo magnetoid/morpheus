@@ -1,7 +1,7 @@
 # Deploying Morpheus on Coolify
 
 This guide walks through deploying Morpheus to a [Coolify](https://coolify.io)
-instance using the included `docker-compose.coolify.yml` manifest.
+instance using the default `docker-compose.yml` manifest.
 
 The compose file is intentionally lean: it ships **web + worker + beat +
 postgres + redis** and lets Coolify handle TLS, routing, secrets, and storage.
@@ -23,7 +23,7 @@ postgres + redis** and lets Coolify handle TLS, routing, secrets, and storage.
 1. In Coolify, choose **+ New Resource → Docker Compose**.
 2. Source: connect to GitHub and pick `magnetoid/morpheus` (or paste the repo
    URL for any fork). Branch: `main`.
-3. **Compose file:** `docker-compose.coolify.yml`
+3. **Compose file:** `docker-compose.yml` (this is the default — nothing to change).
 4. Save.
 
 Coolify will parse the manifest and detect `web` as the public service.
@@ -113,7 +113,7 @@ docker compose run --rm web migrate
 ### Tail logs
 
 ```bash
-docker compose -f docker-compose.coolify.yml logs -f web worker beat
+docker compose -f docker-compose.yml logs -f web worker beat
 ```
 
 ### Scale workers
@@ -130,7 +130,7 @@ no-op; uploaded files go to S3 directly.
 
 If you provision Postgres as a Coolify *Database* resource:
 
-1. Remove the `postgres` service from `docker-compose.coolify.yml` (or
+1. Remove the `postgres` service from `docker-compose.yml` (or
    comment it out and the `depends_on` references).
 2. Set `DATABASE_URL` to the external connection string.
 3. Re-deploy.
@@ -141,7 +141,7 @@ The same applies to Redis.
 
 The transactional outbox publisher in `core/tasks.py:process_outbox` defaults
 to a Celery-driven loop. To use NATS instead, uncomment the `nats` service in
-`docker-compose.coolify.yml`, add `NATS_URL=nats://nats:4222` to the env, and
+`docker-compose.yml`, add `NATS_URL=nats://nats:4222` to the env, and
 re-deploy.
 
 ---

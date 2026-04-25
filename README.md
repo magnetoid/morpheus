@@ -154,29 +154,35 @@ celery -A morph worker -l info
 celery -A morph beat -l info       # for observability rollups
 ```
 
-For the full stack (Postgres + Redis + NATS + OTel collector + Prometheus + Grafana + Vector):
+### Production stack (default `docker-compose.yml`)
+
+`docker-compose.yml` is the **production-ready** manifest: web + worker + beat + postgres + redis. Designed to be picked up zero-config by Coolify, Render, Railway, Dokku, fly.io, or plain `docker compose up -d`.
 
 ```bash
 docker compose up -d
 ```
 
+### Full dev stack
+
+For the local *full* stack (Supabase + Redis + NATS + OTel collector + Prometheus + Grafana + Loki + Vector + ops-agent), use the dev compose:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+```
+
 ### Deploying to Coolify
 
-Drop-in production manifest at [`docker-compose.coolify.yml`](docker-compose.coolify.yml). Full guide: [`docs/deploy-coolify.md`](docs/deploy-coolify.md).
+The default compose file works out of the box. Full guide: [`docs/deploy-coolify.md`](docs/deploy-coolify.md).
 
 ```bash
 # In Coolify: + New Resource → Docker Compose
 #   Repo:         https://github.com/magnetoid/morpheus
-#   Compose file: docker-compose.coolify.yml
+#   Compose file: docker-compose.yml             ← default; nothing to set
 #   Env vars:     paste from .env.coolify.example, set SECRET_KEY + Stripe + LLM keys
 #   Domain:       bind your.domain.com to the `web` service
 ```
 
-The compose ships **web + worker + beat + postgres + redis** wired through
-Coolify magic vars (`SERVICE_FQDN_WEB`, `SERVICE_PASSWORD_POSTGRES`,
-`SERVICE_PASSWORD_REDIS`) so credentials are auto-managed. The `web`
-container's entrypoint waits for the DB, runs `migrate` + `collectstatic`,
-then execs gunicorn.
+The compose ships **web + worker + beat + postgres + redis** wired through Coolify magic vars (`SERVICE_FQDN_WEB`, `SERVICE_PASSWORD_POSTGRES`, `SERVICE_PASSWORD_REDIS`) so credentials are auto-managed. The `web` container's entrypoint waits for the DB, runs `migrate` + `collectstatic`, then execs gunicorn.
 
 ### Importing an existing store
 
