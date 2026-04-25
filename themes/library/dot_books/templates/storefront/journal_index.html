@@ -1,0 +1,33 @@
+{% extends "storefront/base.html" %}
+{% block title %}Journal — dot books{% endblock %}
+
+{% block content %}
+<section style="padding: 4rem 0 2rem;">
+  <div class="wrap" style="max-width: 720px;">
+    <p class="eyebrow">From the journal</p>
+    <h1 class="display display-xl" style="margin: 1.5rem 0 1rem;">
+      Reading the shelf<span class="text-accent">.</span>
+    </h1>
+    <p class="lede">
+      Notes, essays, short pieces from the booksellers. Updated when there's
+      something to say — never on a schedule.
+    </p>
+  </div>
+</section>
+
+<section class="tight" style="padding-top: 1rem;">
+  <div class="wrap" style="max-width: 720px;">
+    <div style="display: grid; gap: 2rem;">
+      {% for entry in entries %}
+      <article style="border-top: 1px solid var(--rule); padding-top: 1.25rem;">
+        <p class="meta">{{ entry.date_label }}</p>
+        <h2 style="font-family: var(--serif); font-size: 1.6rem; font-weight: 500; line-height: 1.2; margin: 0.6rem 0;">
+          <a href="/journal/{{ entry.slug }}/">{{ entry.title }}</a>
+        </h2>
+        <p style="color: var(--ink-2); line-height: 1.55;">{{ entry.excerpt }}</p>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

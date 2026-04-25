@@ -1,0 +1,33 @@
+{% extends "storefront/base.html" %}
+{% block title %}Account — dot books{% endblock %}
+
+{% block content %}
+<section style="padding: 4rem 0 5rem;">
+  <div class="wrap" style="max-width: 720px;">
+    <p class="eyebrow">Your account</p>
+    <h1 class="display display-xl" style="margin: 1.5rem 0 1rem;">
+      Hello{% if user.first_name %}, {{ user.first_name }}{% endif %}<span class="text-accent">.</span>
+    </h1>
+    <p class="lede" style="margin-bottom: 2rem;">
+      Logged in as {{ user.email }}.
+    </p>
+
+    <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;" class="account-grid">
+      <a href="/account/orders/" class="book" style="display: block; padding: 1.25rem 1.5rem; border: 1px solid var(--rule); border-radius: 6px;">
+        <p class="title">Order history</p>
+        <p class="meta" style="margin-top: .35rem;">Past orders, status, receipts.</p>
+      </a>
+      <a href="/products/" class="book" style="display: block; padding: 1.25rem 1.5rem; border: 1px solid var(--rule); border-radius: 6px;">
+        <p class="title">Keep browsing</p>
+        <p class="meta" style="margin-top: .35rem;">Pick up where you left off on the shelf.</p>
+      </a>
+      <a href="/accounts/logout/" class="book" style="display: block; padding: 1.25rem 1.5rem; border: 1px solid var(--rule); border-radius: 6px;">
+        <p class="title">Sign out</p>
+      </a>
+    </div>
+  </div>
+</section>
+<style>
+@media (min-width: 700px) { .account-grid { grid-template-columns: 1fr 1fr !important; } }
+</style>
+{% endblock %}
