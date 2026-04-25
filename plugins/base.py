@@ -276,6 +276,25 @@ class MorpheusPlugin:
         """
         return None
 
+    def contribute_agents(self) -> list:
+        """Return a list of `MorpheusAgent` instances this plugin ships.
+
+        Each agent is registered in `core.agents.agent_registry` and made
+        available to platform UIs (storefront chat, merchant ops console,
+        proactive listeners).
+        """
+        return []
+
+    def contribute_agent_tools(self) -> list:
+        """Return a list of `core.agents.Tool` instances this plugin exposes.
+
+        Tools are scoped capabilities the agent layer can call (e.g.
+        `inventory.reserve_stock`, `catalog.find_products`). Tools are
+        independent of agents — any agent whose scopes cover the tool's
+        scopes will be allowed to call it.
+        """
+        return []
+
     # ── Info ──────────────────────────────────────────────────────────────────
 
     def __repr__(self) -> str:

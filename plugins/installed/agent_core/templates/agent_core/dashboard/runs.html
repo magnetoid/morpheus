@@ -1,0 +1,56 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Agent runs · Morpheus admin{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-semibold">Agent runs</h1>
+  <a href="{% url 'agent_core_dash:console' %}" class="btn btn-primary">
+    <i data-lucide="terminal" class="h-4 w-4"></i> Open console
+  </a>
+</div>
+
+<div class="card">
+  <table class="morph-table">
+    <thead>
+      <tr>
+        <th>Started</th><th>Agent</th><th>State</th><th>User message</th>
+        <th>Tools</th><th>Tokens</th><th>Duration</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in runs %}
+      <tr>
+        <td><a href="{% url 'agent_core_dash:run_detail' run.id %}">{{ run.started_at|date:"M j, H:i" }}</a></td>
+        <td>{{ run.agent_name }}</td>
+        <td>
+          <span class="pill {% if run.state == 'completed' %}pill-success{% elif run.state == 'failed' %}pill-danger{% elif run.state == 'running' %}pill-info{% else %}pill-neutral{% endif %}">
+            {{ run.state }}
+          </span>
+        </td>
+        <td style="max-width: 30rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          {{ run.user_message|truncatechars:120 }}
+        </td>
+        <td>{{ run.tool_call_count }}</td>
+        <td>{{ run.total_tokens }}</td>
+        <td>{{ run.duration_ms }}ms</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" style="padding: 3rem; text-align: center; color: var(--text-muted);">
+        No agent runs yet. <a href="{% url 'agent_core_dash:console' %}">Open the console</a> to talk to Merchant Ops.
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2 class="text-lg font-semibold mt-6 mb-3">Registered agents</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+{% for a in agents %}
+  <div class="card card-padded">
+    <p class="font-medium">{{ a.label }}</p>
+    <p class="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">{{ a.audience }}</p>
+    <p class="text-sm mt-2">{{ a.description }}</p>
+  </div>
+{% endfor %}
+</div>
+{% endblock %}

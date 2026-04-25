@@ -1,76 +1,63 @@
-import json
+"""
+AgentOperator — back-compat shim around `core.agents` runtime.
+
+Historically this was a mocked autonomous loop. The real loop now lives
+in `core.agents.AgentRuntime` + the `agent_core` plugin's Merchant Ops
+agent. This shim exists so existing callers (`listeners.proactive_agent_worker`,
+external scripts) keep working without code changes.
+
+Prefer importing `core.agents.AgentRuntime` or
+`plugins.installed.agent_core.services.run_agent` directly in new code.
+"""
+from __future__ import annotations
+
 import logging
-from api.schema import get_schema
-from core.schema_introspector import SchemaIntrospector
+from typing import Any
+
+from core.agents import agent_registry
 
 logger = logging.getLogger('morpheus.ai.operator')
 
+
 class AgentOperator:
-    """
-    Law 0: Agentic First.
-    The autonomous workflow loop that processes an objective, calls necessary GraphQL tools natively,
-    and returns a final synthesized response.
-    """
-    
-    def __init__(self, provider="openai"):
+    """Compatibility wrapper that runs the Merchant Ops agent."""
+
+    def __init__(self, provider: str = '') -> None:
         self.provider = provider
-        self.schema = get_schema()
-        self.tools = self._get_available_tools()
-        
-    def _get_available_tools(self):
-        """Introspects schema to build internal tool definitions."""
-        introspector = SchemaIntrospector()
-        return introspector.as_agent_tool_map()
 
-    def execute_tool(self, tool_name, kwargs):
-        """Executes a GraphQL tool natively without HTTP overhead."""
-        if tool_name not in self.tools:
-            return {"error": f"Tool {tool_name} not found"}
-            
-        tool = self.tools[tool_name]
-        
-        # Build arguments string
-        args_str = ", ".join([f"{k}: {json.dumps(v)}" for k, v in kwargs.items()])
-        args_block = f"({args_str})" if args_str else ""
-        
-        # We query the entire object blindly for simplicity in this MVP.
-        # In a real environment, we'd dynamically request all scalar sub-fields.
-        graphql_query = f"""
-        {tool['type']} {{
-            {tool['field_name']}{args_block}
-        }}
-        """
-        
-        logger.info(f"AgentOperator executing: {tool_name} with {kwargs}")
-        result = self.schema.execute_sync(graphql_query)
-        
-        if result.errors:
-            logger.error(f"Tool error: {result.errors}")
-            return {"error": str(result.errors[0].message)}
-            
-        return result.data
+    def run_workflow(self, objective: str) -> dict[str, Any]:
+        """Run an objective through the Merchant Ops agent."""
+        from plugins.installed.agent_core.services import run_agent
 
-    def run_workflow(self, objective: str):
-        """
-        Runs the autonomous agent loop.
-        In a complete implementation, this would:
-        1. Send the objective and self.tools to an LLM (e.g. GPT-4).
-        2. Receive a tool call.
-        3. Execute the tool natively via execute_tool().
-        4. Send the result back to the LLM.
-        5. Repeat until the LLM returns a final answer.
-        """
-        logger.info(f"Starting Agent Workflow for objective: {objective}")
-        
-        # Mocking an agent loop for demonstration
-        if "add" in objective.lower() and "cart" in objective.lower():
-            # The LLM decides to call mutate_add_to_cart
-            result = self.execute_tool("mutate_add_to_cart", {"input": "product-slug"})
-            return {"status": "success", "steps_taken": ["mutate_add_to_cart"], "final_result": result}
-            
-        elif "payment" in objective.lower():
-            result = self.execute_tool("mutate_create_payment_intent", {"order_id": "123"})
-            return {"status": "success", "steps_taken": ["mutate_create_payment_intent"], "final_result": result}
-            
-        else:
-            return {"status": "unknown", "message": "Objective requires a real LLM connection"}
+        if agent_registry.get_agent('merchant_ops') is None:
+            return {
+                'status': 'unavailable',
+                'message': 'merchant_ops agent not registered (agent_core not active?)',
+            }
+        try:
+            result = run_agent(
+                agent_name='merchant_ops',
+                user_message=objective,
+                context={'source': 'proactive_agent_worker'},
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.error('AgentOperator.run_workflow failed: %s', e, exc_info=True)
+            return {'status': 'failed', 'error': str(e)}
+        return {
+            'status': result.state,
+            'run_id': result.run_id,
+            'final_text': result.text,
+            'tool_calls': result.tool_calls,
+            'tokens': result.trace.prompt_tokens + result.trace.completion_tokens,
+        }
+
+    def execute_tool(self, tool_name: str, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Direct tool invocation (no LLM). Useful for tests + scripted automations."""
+        tool = agent_registry.get_tool(tool_name)
+        if tool is None:
+            return {'error': f'Tool {tool_name} not found'}
+        try:
+            result = tool.invoke(kwargs or {})
+        except Exception as e:  # noqa: BLE001
+            return {'error': str(e)}
+        return {'output': result.output}

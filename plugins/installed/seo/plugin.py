@@ -31,3 +31,7 @@ class SeoPlugin(MorpheusPlugin):
             autofill_meta_for(product)
         except Exception as e:  # noqa: BLE001 — autofill is best-effort
             logger.warning('seo: autofill failed for product %s: %s', product.id, e, exc_info=True)
+
+    def contribute_agent_tools(self) -> list:
+        from plugins.installed.seo.agent_tools import get_meta_tool, set_meta_tool
+        return [get_meta_tool, set_meta_tool]

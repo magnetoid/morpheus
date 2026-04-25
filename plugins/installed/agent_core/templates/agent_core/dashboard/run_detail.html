@@ -1,0 +1,62 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Run {{ run.id }} · Morpheus admin{% endblock %}
+
+{% block content %}
+<a href="{% url 'agent_core_dash:runs' %}" class="text-sm text-[color:var(--text-muted)]">← All runs</a>
+<h1 class="text-xl font-semibold mt-2 mb-2">{{ run.agent_name }} · {{ run.state }}</h1>
+<p class="text-sm text-[color:var(--text-muted)]">
+  Started {{ run.started_at|date:"M j, Y H:i:s" }} · {{ run.duration_ms }}ms ·
+  {{ run.tool_call_count }} tool calls · {{ run.total_tokens }} tokens ·
+  {{ run.provider }}/{{ run.model }}
+</p>
+
+<div class="card card-padded mt-4">
+  <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">User message</p>
+  <p class="mt-1">{{ run.user_message }}</p>
+</div>
+
+{% if run.final_text %}
+<div class="card card-padded mt-3">
+  <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Final answer</p>
+  <pre style="white-space: pre-wrap; margin-top: .5rem;">{{ run.final_text }}</pre>
+</div>
+{% endif %}
+
+{% if run.error %}
+<div class="card card-padded mt-3" style="border-color: var(--danger);">
+  <p class="text-xs uppercase tracking-wide" style="color: var(--danger);">Error</p>
+  <pre style="white-space: pre-wrap; margin-top: .5rem;">{{ run.error }}</pre>
+</div>
+{% endif %}
+
+<h2 class="text-lg font-semibold mt-6 mb-3">Trace</h2>
+<div class="card">
+  <table class="morph-table">
+    <thead>
+      <tr><th>Step</th><th>Kind</th><th>Name</th><th>Detail</th></tr>
+    </thead>
+    <tbody>
+    {% for step in steps %}
+      <tr>
+        <td>{{ step.seq }}</td>
+        <td>
+          <span class="pill {% if step.kind == 'tool_call' %}pill-info{% elif step.kind == 'tool_result' %}pill-success{% elif step.kind == 'error' %}pill-danger{% elif step.kind == 'final' %}pill-success{% else %}pill-neutral{% endif %}">
+            {{ step.kind }}
+          </span>
+        </td>
+        <td>{{ step.name }}</td>
+        <td>
+          {% if step.kind == 'tool_call' %}
+            <code style="font-size: .8rem;">{{ step.arguments }}</code>
+          {% elif step.kind == 'tool_result' %}
+            <code style="font-size: .8rem;">{{ step.output|truncatechars:200 }}</code>
+          {% else %}
+            <span style="white-space: pre-wrap;">{{ step.content|truncatechars:300 }}</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

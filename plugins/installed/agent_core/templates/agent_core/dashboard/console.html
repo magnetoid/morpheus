@@ -1,0 +1,65 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Ops console · Morpheus admin{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-2">Ops console</h1>
+<p class="text-sm text-[color:var(--text-muted)] mb-4">
+  Talk to Merchant Ops. Ask it to query analytics, surface low-stock items, draft copy.
+</p>
+
+<div class="card" style="display: flex; flex-direction: column; height: 70vh;">
+  <div id="console-log" style="flex:1; overflow-y:auto; padding: 1rem; font-size: .9rem;"></div>
+  <form id="console-form" style="display:flex; gap:.5rem; padding: .75rem; border-top: 1px solid var(--border);">
+    <input type="text" name="message" placeholder="Show me revenue for the last 7 days…"
+      autocomplete="off" required style="flex:1;" class="input">
+    <button type="submit" class="btn btn-primary">Send</button>
+  </form>
+</div>
+
+<script>
+(function() {
+  var form = document.getElementById('console-form');
+  var log = document.getElementById('console-log');
+
+  function append(role, text) {
+    var div = document.createElement('div');
+    div.style.margin = '.65rem 0';
+    div.style.padding = '.65rem .85rem';
+    div.style.borderRadius = '8px';
+    div.style.background = role === 'user' ? 'var(--surface-2)' : 'var(--surface)';
+    div.style.border = role === 'user' ? 'none' : '1px solid var(--border)';
+    div.innerHTML = '<strong style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">' +
+      (role === 'user' ? 'You' : 'Merchant Ops') + '</strong><div style="margin-top:.25rem;white-space:pre-wrap;">' +
+      text.replace(/[<>&]/g, function(m) { return {'<':'&lt;','>':'&gt;','&':'&amp;'}[m]; }) + '</div>';
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var input = form.querySelector('input[name=message]');
+    var text = (input.value || '').trim();
+    if (!text) return;
+    append('user', text);
+    input.value = '';
+    var thinking = document.createElement('div');
+    thinking.style.cssText = 'margin: .5rem 0; color: var(--text-muted); font-style: italic;';
+    thinking.textContent = 'Working…';
+    log.appendChild(thinking);
+    fetch('/api/agents/merchant_ops/invoke', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: text})
+    }).then(function(r) { return r.json(); })
+      .then(function(data) {
+        thinking.remove();
+        append('agent', data.text || data.error || '(no reply)');
+      })
+      .catch(function() {
+        thinking.remove();
+        append('agent', 'Sorry — connection error.');
+      });
+  });
+})();
+</script>
+{% endblock %}
