@@ -76,9 +76,11 @@ Morpheus wins by being infinitely scalable, horizontally extensible via a rigoro
 
 ### LAW 11 — Observable by Design
 **If it isn't traced and logged properly, it didn't happen.**
-- Use the standard `logging` module. OpenTelemetry automatically injects `trace_id` and `span_id` into every log line.
-- Do not log raw PII or PCI data.
-- Ensure all Celery tasks and database queries occur within an active trace context to maintain request/event correlation across the web and worker containers.
+- Use the standard `logging` module. The `RequestIdFilter` injects `request_id` into every record automatically; in production logs come out as one-line JSON.
+- OpenTelemetry injects `trace_id` and `span_id` when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+- Do not log raw PII or PCI data. Sentry's `before_send` already scrubs auth tokens, cookies, password / secret / token / card.
+- Ensure all Celery tasks and database queries occur within an active trace + request_id context. Workers automatically inherit the request_id contextvar.
+- Unhandled errors in DRF or GraphQL are masked and persisted to `ErrorEvent` (observability plugin) with the `request_id` — never let stack traces leak through API responses.
 
 ---
 

@@ -1,8 +1,10 @@
-# Morpheus CMS — Living Architecture Document
+# Morpheus — Living Architecture Document
 
-> **Status:** Phase 1 shipped (sprints 1–9). Phase 2 in progress.
+> **Status:** Phase 1 shipped (sprints 1–11). **20 plugins**, dot_books theme, observability + SEO + demo seeder + Cloudflare + Functions runtime online. **98 / 98 tests passing.**
 > **Last updated:** 2026-04-25
 > **Procedural companion:** [`SKILLS.md`](SKILLS.md) — every change here must have a matching skill.
+> **Plugin guide:** [`docs/PLUGIN_DEVELOPMENT.md`](docs/PLUGIN_DEVELOPMENT.md) · **Theme guide:** [`docs/THEME_DEVELOPMENT.md`](docs/THEME_DEVELOPMENT.md)
+> **Deploy:** [`docs/deploy-coolify.md`](docs/deploy-coolify.md) · [`docs/deploy-plesk-nginx.md`](docs/deploy-plesk-nginx.md)
 > **Rule:** This document is the source of truth for *what* and *why*. `SKILLS.md` is the source of truth for *how*. The platform laws live in [`RULES.md`](RULES.md).
 
 ---
