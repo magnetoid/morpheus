@@ -86,3 +86,81 @@ class RestPermissionTests(TestCase):
         # The /rest/ duplicate of v1 should no longer exist.
         resp = self.client.get('/rest/products/')
         self.assertEqual(resp.status_code, 404)
+
+
+class RequestIdMiddlewareTests(TestCase):
+    """Every response carries an X-Request-ID header (generated or echoed)."""
+
+    def test_response_carries_generated_request_id(self):
+        resp = self.client.get('/healthz')
+        self.assertIn('X-Request-ID', resp.headers)
+        self.assertGreaterEqual(len(resp.headers['X-Request-ID']), 16)
+
+    def test_response_echoes_inbound_request_id(self):
+        resp = self.client.get('/healthz', HTTP_X_REQUEST_ID='caller-rid-123')
+        self.assertEqual(resp.headers['X-Request-ID'], 'caller-rid-123')
+
+
+class JsonFormatterTests(TestCase):
+    def test_json_formatter_emits_required_fields(self):
+        import logging
+        import json as _json
+        from core.log_formatters import JsonFormatter
+        from core.request_id import _request_id_ctx
+
+        token = _request_id_ctx.set('rid-test-1')
+        try:
+            rec = logging.LogRecord(
+                name='morph.test', level=logging.INFO, pathname='', lineno=1,
+                msg='hello %s', args=('world',), exc_info=None,
+            )
+            from core.request_id import RequestIdFilter
+            RequestIdFilter().filter(rec)
+            payload = _json.loads(JsonFormatter().format(rec))
+            self.assertEqual(payload['msg'], 'hello world')
+            self.assertEqual(payload['level'], 'INFO')
+            self.assertEqual(payload['request_id'], 'rid-test-1')
+        finally:
+            _request_id_ctx.reset(token)
+
+
+class SentryScrubberTests(TestCase):
+    def test_before_send_scrubs_auth_headers_and_password(self):
+        from core.sentry import _before_send
+        event = {
+            'request': {
+                'headers': {
+                    'Authorization': 'Bearer SECRET',
+                    'X-Agent-Token': 'tok',
+                    'User-Agent': 'curl/8',
+                },
+                'data': {'username': 'u', 'password': 'p', 'card_number': '4242424242424242'},
+                'cookies': 'sessionid=abc',
+            },
+            'extra': {'api_key': 'leak'},
+        }
+        out = _before_send(event, hint={})
+        self.assertEqual(out['request']['headers']['Authorization'], '[scrubbed]')
+        self.assertEqual(out['request']['headers']['X-Agent-Token'], '[scrubbed]')
+        self.assertEqual(out['request']['headers']['User-Agent'], 'curl/8')
+        self.assertEqual(out['request']['data']['password'], '[scrubbed]')
+        self.assertEqual(out['request']['data']['card_number'], '[scrubbed]')
+        self.assertEqual(out['request']['data']['username'], 'u')
+        self.assertEqual(out['request']['cookies'], '[scrubbed]')
+        self.assertEqual(out['extra']['api_key'], '[scrubbed]')
+
+
+class DRFExceptionHandlerTests(TestCase):
+    def test_unhandled_drf_exception_returns_envelope(self):
+        from unittest.mock import MagicMock
+        from rest_framework.exceptions import NotAuthenticated
+        from api.exception_handler import morpheus_exception_handler
+
+        # NotAuthenticated -> DRF default handler returns a 401, our wrapper repackages it.
+        ctx = {'view': MagicMock(), 'args': (), 'kwargs': {}, 'request': MagicMock()}
+        resp = morpheus_exception_handler(NotAuthenticated('nope'), ctx)
+        self.assertEqual(resp.status_code, 401)
+        body = resp.data
+        self.assertEqual(body['status'], 'error')
+        self.assertEqual(body['code'], 'NotAuthenticated')
+        self.assertIn('request_id', body)

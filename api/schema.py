@@ -59,6 +59,52 @@ class _PermissionToGraphQLError(SchemaExtension):
                 err.extensions['code'] = 'PERMISSION_DENIED'
 
 
+class _MaskUnhandledErrors(SchemaExtension):
+    """
+    Mask any unhandled exception inside a resolver to `INTERNAL_ERROR` and
+    log it with the request_id. Prevents stack traces / model paths from
+    leaking through GraphQL responses.
+
+    PermissionDenied + GraphQLError keep their normal behavior (handled
+    by `_PermissionToGraphQLError` and Strawberry, respectively).
+    """
+
+    def on_executing_end(self) -> None:  # type: ignore[override]
+        from graphql import GraphQLError
+        from core.request_id import current_request_id
+
+        result = self.execution_context.result
+        if not result or not result.errors:
+            return
+        request_id = current_request_id()
+        for err in result.errors:
+            original = getattr(err, 'original_error', None)
+            if original is None:
+                continue
+            if isinstance(original, (GraphQLError, PermissionDenied)):
+                continue
+            logger.error(
+                'graphql: unhandled %s in resolver: %s',
+                type(original).__name__, original,
+                exc_info=(type(original), original, original.__traceback__),
+                extra={'request_id': request_id},
+            )
+            try:
+                from plugins.installed.observability.services import record_error
+                record_error(
+                    source='api.graphql',
+                    message=str(original)[:5000],
+                    metadata={'request_id': request_id, 'type': type(original).__name__},
+                )
+            except Exception:  # noqa: BLE001
+                pass
+            err.message = 'Internal server error.'
+            if err.extensions is None:
+                err.extensions = {}
+            err.extensions['code'] = 'INTERNAL_ERROR'
+            err.extensions['request_id'] = request_id
+
+
 def build_schema() -> strawberry.Schema:
     """Assemble the schema from core types + all plugin extension modules."""
     from plugins.registry import plugin_registry
@@ -92,7 +138,7 @@ def build_schema() -> strawberry.Schema:
     return strawberry.Schema(
         query=Query,
         mutation=Mutation,
-        extensions=[_PermissionToGraphQLError],
+        extensions=[_PermissionToGraphQLError, _MaskUnhandledErrors],
     )
 
 
