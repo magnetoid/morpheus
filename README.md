@@ -160,6 +160,24 @@ For the full stack (Postgres + Redis + NATS + OTel collector + Prometheus + Graf
 docker compose up -d
 ```
 
+### Deploying to Coolify
+
+Drop-in production manifest at [`docker-compose.coolify.yml`](docker-compose.coolify.yml). Full guide: [`docs/deploy-coolify.md`](docs/deploy-coolify.md).
+
+```bash
+# In Coolify: + New Resource → Docker Compose
+#   Repo:         https://github.com/magnetoid/morpheus
+#   Compose file: docker-compose.coolify.yml
+#   Env vars:     paste from .env.coolify.example, set SECRET_KEY + Stripe + LLM keys
+#   Domain:       bind your.domain.com to the `web` service
+```
+
+The compose ships **web + worker + beat + postgres + redis** wired through
+Coolify magic vars (`SERVICE_FQDN_WEB`, `SERVICE_PASSWORD_POSTGRES`,
+`SERVICE_PASSWORD_REDIS`) so credentials are auto-managed. The `web`
+container's entrypoint waits for the DB, runs `migrate` + `collectstatic`,
+then execs gunicorn.
+
 ### Importing an existing store
 
 ```bash

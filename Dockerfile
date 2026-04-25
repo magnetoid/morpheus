@@ -47,7 +47,8 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY --chown=morpheus:morpheus . /app
 
-RUN python manage.py collectstatic --noinput || true
+# Ensure the entrypoint is executable inside the image even if the host bit was lost.
+RUN chmod +x /app/scripts/docker-entrypoint.sh
 
 USER morpheus
 EXPOSE 8000
@@ -55,4 +56,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -fsS http://localhost:${PORT}/healthz || exit 1
 
-CMD ["sh", "-c", "gunicorn morph.wsgi:application --bind 0.0.0.0:${PORT} --workers ${GUNICORN_WORKERS} --timeout ${GUNICORN_TIMEOUT} --access-logfile - --error-logfile -"]
+ENTRYPOINT ["/app/scripts/docker-entrypoint.sh"]
+CMD ["web"]
