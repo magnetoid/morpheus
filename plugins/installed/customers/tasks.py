@@ -1,1 +1,1 @@
-from morpheus.celery import app
+from morph.celery import app
