@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: morpheus-web
+  namespace: morpheus
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: morpheus-web
+  template:
+    metadata:
+      labels:
+        app: morpheus-web
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/your-org/morpheus-web:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: morpheus-config
+            - secretRef:
+                name: morpheus-secrets
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: morpheus-web
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1024Mi"
+

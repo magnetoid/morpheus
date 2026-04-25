@@ -25,6 +25,10 @@ class Cart(models.Model):
 
     class Meta:
         ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['session_key']),
+            models.Index(fields=['customer', '-updated_at']),
+        ]
 
     def __str__(self):
         owner = self.customer.email if self.customer else self.session_key
@@ -73,14 +77,17 @@ class OrderEvent(models.Model):
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order = models.ForeignKey('Order', on_delete=models.CASCADE, related_name='events')
-    event_type = models.CharField(max_length=50)
+    event_type = models.CharField(max_length=50, db_index=True)
     previous_state = models.CharField(max_length=50, blank=True)
     new_state = models.CharField(max_length=50, blank=True)
     message = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['order', '-created_at']),
+        ]
 
 class Order(models.Model):
     STATUS_CHOICES = [
@@ -145,6 +152,10 @@ class Order(models.Model):
             models.Index(fields=['order_number']),
             models.Index(fields=['status']),
             models.Index(fields=['customer']),
+            models.Index(fields=['email']),
+            models.Index(fields=['channel', 'status']),
+            models.Index(fields=['-placed_at']),
+            models.Index(fields=['payment_status']),
         ]
 
     def __str__(self):

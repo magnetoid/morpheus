@@ -1,0 +1,20 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: worker-keda-autoscaler
+  namespace: morpheus
+spec:
+  scaleTargetRef:
+    name: morpheus-worker
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  triggers:
+    - type: nats-jetstream
+      metadata:
+        natsServerMonitoringEndpoint: "http://nats:8222"
+        account: "$G"
+        stream: "morpheus_events"
+        consumer: "worker-celery-consumer"  # Or your NATS consumer name
+        lagThreshold: "100"

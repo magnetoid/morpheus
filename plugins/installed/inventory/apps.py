@@ -8,6 +8,7 @@ class InventoryConfig(AppConfig):
     def ready(self):
         from plugins.registry import plugin_registry
         from plugins.installed.inventory.plugin import InventoryPlugin
+        import plugins.installed.inventory.signals
         if 'inventory' not in plugin_registry._classes:
             plugin_registry._classes['inventory'] = InventoryPlugin
 

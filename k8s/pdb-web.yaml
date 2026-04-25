@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: morpheus-web
+  namespace: morpheus
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: morpheus-web
+

@@ -150,6 +150,16 @@ This is not a dashboard. This is an agent that **acts** and **alerts**.
 | Product description has < 50 words | Auto-generate full description | Auto if configured |
 | New product uploaded with no images | Alert merchant, suggest stock photos | Alert only |
 | Conversion rate drops 20% week-over-week | Diagnose funnel, generate report | Alert + report |
+| Traffic spikes causing NATS event lag | Auto-scale Kubernetes Workers via GitOps PR | Auto (Ops Agent) |
+
+### GitOps Ops-Agent
+
+The Morpheus Ops-Agent acts as an autonomous SRE. It reads metrics from Prometheus (e.g., HTTP duration, NATS queue depth) and, instead of just sending an alert, uses the GitHub API to author a GitOps Pull Request. 
+
+For instance, if `morpheus-web` needs more replicas, the Ops Agent:
+1. Creates a new branch.
+2. Modifies the `replicas: X` value in `k8s/deployment-web.yaml`.
+3. Opens a PR against `main` for the team to review, effectively tying auto-scaling into the Git history.
 
 ### MerchantInsight Model
 
@@ -226,6 +236,8 @@ Virtual bundles are ephemeral (not saved to DB) unless the customer adds them to
 > AI agents from other systems can autonomously browse and purchase.
 
 Morpheus exposes a structured **Agent Commerce Protocol** — a standard way for external AI agents (OpenAI Assistants, Claude tools, custom agents) to interact with the store.
+
+This is secured natively by the `AgentAuthMiddleware`. The middleware intercepts `/graphql/agent/` requests, extracts the JWT Bearer token, validates the agent's scopes, and attaches an `AgentProfile` to the `request` context before GraphQL execution.
 
 ### Agent Registration
 

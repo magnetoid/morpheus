@@ -13,4 +13,8 @@ from django.core.wsgi import get_wsgi_application
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'morph.settings')
 
+from core.observability import init_observability
+
+init_observability()
+
 application = get_wsgi_application()

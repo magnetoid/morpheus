@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: morpheus-worker
+  namespace: morpheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: morpheus-worker
+  template:
+    metadata:
+      labels:
+        app: morpheus-worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/your-org/morpheus-web:latest
+          command: ["celery", "-A", "morph", "worker", "-l", "info"]
+          envFrom:
+            - configMapRef:
+                name: morpheus-config
+            - secretRef:
+                name: morpheus-secrets
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: morpheus-worker
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1024Mi"
+

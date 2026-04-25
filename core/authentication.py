@@ -2,71 +2,80 @@
 Morpheus CMS — API Key Authentication & RBAC
 Enforces scopes for external headless clients and Remote Plugins.
 """
-from rest_framework import authentication
-from rest_framework import exceptions
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Optional, Tuple
+
 from django.utils.translation import gettext_lazy as _
+from rest_framework import authentication, exceptions, permissions
+
+if TYPE_CHECKING:
+    from rest_framework.request import Request
+    from rest_framework.views import APIView
+
 from core.models import APIKey
+
 
 class MorpheusAPIKeyAuthentication(authentication.BaseAuthentication):
     """
-    Validates the `Authorization: Bearer <key>` header against `APIKey` records.
-    Attaches the APIKey instance to the request for channel scoping and scope validation.
+    Validates `Authorization: Bearer <key>` against the APIKey table.
+    Returns (None, APIKey) — request.user stays anonymous, request.auth carries the key.
     """
     keyword = 'Bearer'
 
-    def authenticate(self, request):
+    def authenticate(self, request: 'Request') -> Optional[Tuple[None, APIKey]]:
         auth = authentication.get_authorization_header(request).split()
-
         if not auth or auth[0].lower() != self.keyword.lower().encode():
             return None
-
         if len(auth) == 1:
-            msg = _('Invalid token header. No credentials provided.')
-            raise exceptions.AuthenticationFailed(msg)
-        elif len(auth) > 2:
-            msg = _('Invalid token header. Token string should not contain spaces.')
-            raise exceptions.AuthenticationFailed(msg)
-
+            raise exceptions.AuthenticationFailed(
+                _('Invalid token header. No credentials provided.')
+            )
+        if len(auth) > 2:
+            raise exceptions.AuthenticationFailed(
+                _('Invalid token header. Token string should not contain spaces.')
+            )
         try:
             token = auth[1].decode()
-        except UnicodeError:
-            msg = _('Invalid token header. Token string should not contain invalid characters.')
-            raise exceptions.AuthenticationFailed(msg)
-
+        except UnicodeError as e:
+            raise exceptions.AuthenticationFailed(
+                _('Invalid token header. Token string contains invalid characters.')
+            ) from e
         return self.authenticate_credentials(token, request)
 
-    def authenticate_credentials(self, key, request=None):
+    def authenticate_credentials(
+        self, key: str, request: Optional['Request'] = None
+    ) -> Tuple[None, APIKey]:
         try:
-            # We look up the key. In production, we should cache this lookup.
             api_key = APIKey.objects.select_related('channel').get(key=key, is_active=True)
-        except APIKey.DoesNotExist:
-            raise exceptions.AuthenticationFailed(_('Invalid API key.'))
-
-        # Attach the api key to the request so viewsets can check scopes/channels
-        request._morpheus_api_key = api_key
-        
-        # We return (None, api_key) because this isn't a "User".
-        # This keeps request.user anonymous, but request.auth contains the APIKey.
+        except APIKey.DoesNotExist as e:
+            raise exceptions.AuthenticationFailed(_('Invalid API key.')) from e
+        if request is not None:
+            request._morpheus_api_key = api_key  # type: ignore[attr-defined]
         return (None, api_key)
 
 
-class HasScopePermission:
+class HasScopePermission(permissions.BasePermission):
     """
-    DRF Permission class to check if the current APIKey has a required scope.
-    Usage in ViewSet:
-        permission_classes = [HasScope('read:products')]
+    DRF permission that checks the authenticated APIKey carries a required scope.
+    Falls back to `is_staff` when the caller is a session-authed admin.
+
+    Usage:
+        permission_classes = [HasScopePermission.for_scope('read:products')]
     """
-    def __init__(self, required_scope):
-        self.required_scope = required_scope
+    required_scope: Optional[str] = None
 
-    def __call__(self):
-        return self
+    @classmethod
+    def for_scope(cls, scope: str) -> type['HasScopePermission']:
+        return type(
+            f'HasScope_{scope.replace(":", "_")}',
+            (cls,),
+            {'required_scope': scope},
+        )
 
-    def has_permission(self, request, view):
-        # If it's a regular logged in user, maybe they have full access?
-        # For this implementation, we enforce API Key scopes.
-        if hasattr(request, '_morpheus_api_key'):
-            return request._morpheus_api_key.has_scope(self.required_scope)
-        
-        # Fallback to session auth for admins
-        return request.user and request.user.is_staff
+    def has_permission(self, request: 'Request', view: 'APIView') -> bool:
+        api_key = getattr(request, '_morpheus_api_key', None)
+        if api_key is not None and self.required_scope is not None:
+            return api_key.has_scope(self.required_scope)
+        user = getattr(request, 'user', None)
+        return bool(user and user.is_authenticated and getattr(user, 'is_staff', False))
