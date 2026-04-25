@@ -127,6 +127,7 @@ MIDDLEWARE = [
     'api.rate_limit.RateLimitMiddleware',
     'plugins.installed.environments.middleware.EnvironmentMiddleware',
     'plugins.installed.seo.middleware.SeoRedirectMiddleware',
+    'core.request_id.RequestIdMiddleware',
 ]
 
 ROOT_URLCONF = 'morph.urls'
@@ -306,6 +307,7 @@ REST_FRAMEWORK = {
         'anon': config('DRF_THROTTLE_ANON', default='100/hour'),
         'user': config('DRF_THROTTLE_USER', default='1000/hour'),
     },
+    'EXCEPTION_HANDLER': 'api.exception_handler.morpheus_exception_handler',
 }
 
 # ── CORS ───────────────────────────────────────────────────────────────────────
@@ -362,17 +364,47 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
 
 # ── Logging ────────────────────────────────────────────────────────────────────
+# Pretty text formatter in DEBUG, single-line JSON in production. Every record
+# carries `request_id` via the RequestIdFilter so logs correlate end-to-end.
+_LOG_FORMAT = 'pretty' if DEBUG else 'json'
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        'request_id': {
+            '()': 'core.request_id.RequestIdFilter',
+        },
+    },
     'formatters': {
-        'morph': {'format': '[MORPHEUS] {levelname} {asctime} {module}: {message}', 'style': '{'},
+        'pretty': {
+            'format': '[MORPHEUS] {levelname} {asctime} [{request_id}] {module}: {message}',
+            'style': '{',
+        },
+        'json': {
+            '()': 'core.log_formatters.JsonFormatter',
+        },
     },
     'handlers': {
-        'console': {'class': 'logging.StreamHandler', 'formatter': 'morph'},
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': _LOG_FORMAT,
+            'filters': ['request_id'],
+        },
     },
     'root': {'handlers': ['console'], 'level': 'INFO'},
     'loggers': {
-        'morph': {'handlers': ['console'], 'level': 'DEBUG' if DEBUG else 'INFO', 'propagate': False},
+        'morph':    {'handlers': ['console'], 'level': 'DEBUG' if DEBUG else 'INFO', 'propagate': False, 'filters': ['request_id']},
+        'morpheus': {'handlers': ['console'], 'level': 'DEBUG' if DEBUG else 'INFO', 'propagate': False, 'filters': ['request_id']},
     },
 }
+
+# ── Sentry ─────────────────────────────────────────────────────────────────────
+# init_sentry() is a no-op when SENTRY_DSN is not set. It scrubs Authorization,
+# X-Agent-Token, Cookie, and any *password*/*secret*/*token*/*card* keys from
+# every event before sending.
+try:
+    from core.sentry import init_sentry
+    init_sentry()
+except Exception:  # noqa: BLE001 — observability must never block app boot
+    pass
