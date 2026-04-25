@@ -50,6 +50,7 @@ agent to do work in this repo.
 | [Search](#14-semantic-search) | embed a product, query embeddings, fall back to keyword |
 | [Deploy](#15-deploy--operations) | deploy to Coolify, deploy to k8s, run migrations safely, swap external DB |
 | [Quality](#16-quality--ci) | add a test, add coverage, add a permission boundary test, run pre-commit |
+| [Themes](#17-themes) | scaffold a theme, override a template, expose design tokens, switch active theme |
 
 ---
 
@@ -545,6 +546,52 @@ agent to do work in this repo.
 2. `ruff check . && ruff format --check .`.
 3. `python manage.py test --noinput`.
 **Validate:** GitHub Actions run on the PR is green. (CI billing on the account must be active.)
+
+---
+
+# 17. Themes
+
+> Full theming guide at [`docs/THEME_DEVELOPMENT.md`](docs/THEME_DEVELOPMENT.md).
+> Themes override templates and ship design tokens; they do **not** run business logic.
+
+### Skill: scaffold a new theme
+**When:** designing a new storefront look.
+**Steps:**
+1. `python manage.py morph_create_theme <name> --label "Display Name" [--from dot_books]`
+2. `export MORPHEUS_ACTIVE_THEME=<name>` (or update `morph/settings.py`).
+3. `python manage.py check` — your theme should appear in the activation log as `Active theme: <name>`.
+4. `python manage.py runserver` and open `/`.
+**Validate:** `theme_registry.active.name == "<name>"` and the home page renders your `templates/storefront/home.html`.
+**See also:** [`themes/management/commands/morph_create_theme.py`](themes/management/commands/morph_create_theme.py).
+
+### Skill: override a single template
+**When:** swap one storefront page (e.g. a custom home) without rewriting the rest.
+**Steps:**
+1. Create the file at `themes/library/<name>/templates/storefront/<page>.html` — same path as the plugin template you want to replace.
+2. Use `{% extends "storefront/base.html" %}` to inherit the theme's shell.
+3. Restart server (templates are template-loader cached).
+**Validate:** the route renders your override; `git diff` shows only one new file.
+
+### Skill: expose design tokens
+**When:** every theme should declare its palette + type + radii so the dashboard editor (and future CSS-var export) works.
+**Steps:**
+1. Implement `get_design_tokens()` in `theme.py` — see the dot books theme for the canonical example.
+2. Mirror the tokens in your CSS as `:root { --<token>: <value> }` so a future export can swap them.
+**Validate:** `theme_registry.active.get_design_tokens()` returns a non-empty dict.
+
+### Skill: switch the active theme at runtime
+**When:** A/B test or per-channel theming.
+**Steps:**
+1. Persist a `themes.ThemeConfig(theme_name=…, is_active=True)` row.
+2. Call `theme_registry.set_active_from_db()` (it reads ThemeConfig first, falls back to settings).
+**Validate:** the storefront renders the new theme on the next request.
+
+### Skill: gate a theme on required plugins
+**When:** your theme uses templates that only make sense if a particular plugin is active (e.g. a `marketplace/vendor_card.html`).
+**Steps:**
+1. Set `requires_plugins = ["marketplace"]` on your `MorpheusTheme` subclass.
+2. Run `theme_registry.validate_active_theme()` — it will return an error string if the plugin isn't active.
+**Validate:** disable the plugin temporarily; the validation surface complains. Re-enable; clean.
 
 ---
 

@@ -1,78 +1,138 @@
 """
-Morpheus CMS — Theme Registry
+Morpheus — Theme Registry.
+
+Discovers themes from `themes/library/<name>/theme.py`, validates them, and
+chooses one as active (driven by `settings.MORPHEUS_ACTIVE_THEME`, with a
+DB-backed override via `themes.models.ThemeConfig`).
 """
+from __future__ import annotations
+
 import importlib
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from themes.base import MorpheusTheme
+if TYPE_CHECKING:
+    from themes.base import MorpheusTheme
 
 logger = logging.getLogger('morpheus.themes')
 
 
 class ThemeRegistry:
-    def __init__(self):
-        self._themes: dict[str, MorpheusTheme] = {}
+    def __init__(self) -> None:
+        self._themes: dict[str, 'MorpheusTheme'] = {}
         self._active_name: str | None = None
 
+    # ── Discovery ──────────────────────────────────────────────────────────────
+
     def discover(self, themes_dir: Path) -> None:
-        """Discover all themes in the themes library directory."""
+        from themes.base import MorpheusTheme
+
         if not themes_dir.exists():
+            logger.warning('themes: themes_dir does not exist: %s', themes_dir)
             return
         for theme_dir in themes_dir.iterdir():
-            if theme_dir.is_dir() and (theme_dir / 'theme.py').exists():
-                try:
-                    module_path = f"themes.library.{theme_dir.name}.theme"
-                    mod = importlib.import_module(module_path)
-                    for attr in dir(mod):
-                        obj = getattr(mod, attr)
-                        if (
-                            isinstance(obj, type)
-                            and issubclass(obj, MorpheusTheme)
-                            and obj is not MorpheusTheme
-                            and obj.name
-                        ):
-                            instance = obj()
-                            self._themes[obj.name] = instance
-                            logger.debug(f"Discovered theme: {obj.name}")
-                except Exception as e:
-                    logger.error(f"Failed to load theme from {theme_dir}: {e}", exc_info=True)
+            if not theme_dir.is_dir() or not (theme_dir / 'theme.py').exists():
+                continue
+            module_path = f'themes.library.{theme_dir.name}.theme'
+            try:
+                mod = importlib.import_module(module_path)
+            except ImportError as e:
+                logger.error('themes: import error %s: %s', module_path, e, exc_info=True)
+                continue
+            theme_cls = self._find_theme_class(mod, MorpheusTheme)
+            if theme_cls is None:
+                logger.warning('themes: no MorpheusTheme subclass in %s', module_path)
+                continue
+            try:
+                instance = theme_cls()
+            except Exception as e:  # noqa: BLE001 — bad theme should not break boot
+                logger.error('themes: instantiation failed for %s: %s', theme_cls.__name__, e, exc_info=True)
+                continue
+            self._themes[instance.name] = instance
+            logger.debug('themes: discovered %s', instance.name)
+
+    @staticmethod
+    def _find_theme_class(module, base) -> type | None:
+        for attr in dir(module):
+            obj = getattr(module, attr)
+            if (
+                isinstance(obj, type)
+                and issubclass(obj, base)
+                and obj is not base
+                and getattr(obj, 'name', '')
+            ):
+                return obj
+        return None
+
+    # ── Activation ─────────────────────────────────────────────────────────────
 
     def set_active(self, name: str) -> None:
+        """Activate a theme by name. Logs a warning if not discovered."""
         if name in self._themes:
             self._active_name = name
-            logger.info(f"Active theme: {name}")
-        else:
-            logger.warning(f"Theme '{name}' not found. Keeping current: {self._active_name}")
+            logger.info('Active theme: %s', name)
+            return
+        logger.warning(
+            'themes: theme %r not found among %s. Keeping current: %s',
+            name, sorted(self._themes), self._active_name,
+        )
 
     def set_active_from_db(self) -> None:
         """Read active theme from DB (ThemeConfig) or fall back to settings."""
+        from django.conf import settings
+        from django.db import DatabaseError
+
+        row = None
         try:
             from themes.models import ThemeConfig
             row = ThemeConfig.objects.filter(is_active=True).first()
-            if row and row.theme_name in self._themes:
-                self._active_name = row.theme_name
-                return
-        except Exception:
-            pass
-        from django.conf import settings
-        self._active_name = getattr(settings, 'MORPHEUS_ACTIVE_THEME', 'aurora')
+        except (DatabaseError, ImportError, LookupError):
+            row = None
+        if row and row.theme_name in self._themes:
+            self._active_name = row.theme_name
+            return
+        self._active_name = getattr(settings, 'MORPHEUS_ACTIVE_THEME', '')
+
+    # ── Validation ─────────────────────────────────────────────────────────────
+
+    def validate_active_theme(self) -> list[str]:
+        """Return a list of error strings if the active theme is misconfigured."""
+        errors: list[str] = []
+        theme = self.active
+        if theme is None:
+            return ['No active theme.']
+        if theme.requires_plugins:
+            try:
+                from plugins.registry import plugin_registry
+                missing = [p for p in theme.requires_plugins if not plugin_registry.is_active(p)]
+                if missing:
+                    errors.append(
+                        f'Theme "{theme.name}" requires plugins {missing} which are not active.'
+                    )
+            except ImportError:
+                pass
+        return errors
+
+    # ── Accessors ──────────────────────────────────────────────────────────────
 
     @property
-    def active(self) -> MorpheusTheme | None:
-        return self._themes.get(self._active_name)
+    def active(self) -> 'MorpheusTheme | None':
+        return self._themes.get(self._active_name) if self._active_name else None
 
     @property
     def active_templates_dir(self) -> str | None:
         theme = self.active
         return theme.templates_dir if theme else None
 
-    def all_themes(self) -> list[MorpheusTheme]:
+    def all_themes(self) -> list['MorpheusTheme']:
         return list(self._themes.values())
 
-    def get(self, name: str) -> MorpheusTheme | None:
+    def get(self, name: str) -> 'MorpheusTheme | None':
         return self._themes.get(name)
 
+    def __repr__(self) -> str:
+        return f'<ThemeRegistry: {len(self._themes)} themes, active={self._active_name!r}>'
 
-# Global singleton
+
 theme_registry = ThemeRegistry()
