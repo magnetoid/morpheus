@@ -1,0 +1,73 @@
+{% extends "storefront/base.html" %}
+{% block title %}Your cart — dot books{% endblock %}
+
+{% block content %}
+<section style="padding: 3rem 0 5rem;">
+  <div class="wrap">
+    <p class="eyebrow">Cart</p>
+    <h1 class="display display-l" style="margin: 1rem 0 2.5rem;">Your shelf, queued for shipping<span class="text-accent">.</span></h1>
+
+    {% if cart.items %}
+    <div style="display:grid; gap: 3rem; grid-template-columns: 1fr;" class="cart-grid">
+      <div>
+        <table style="width:100%; border-collapse: collapse;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--rule);">
+              <th style="text-align:left; padding: 1rem 0; font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); font-weight: 600;">Book</th>
+              <th style="text-align:right; padding: 1rem 0; font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); font-weight: 600;">Qty</th>
+              <th style="text-align:right; padding: 1rem 0; font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); font-weight: 600;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in cart.items %}
+            <tr style="border-bottom: 1px solid var(--rule);">
+              <td style="padding: 1.25rem 0;">
+                <div style="display:flex; gap: 1rem; align-items: flex-start;">
+                  {% if item.product.primaryImage %}
+                  <div class="cover-wrap" style="width: 64px; aspect-ratio: 2/3; flex-shrink: 0;"><img src="{{ item.product.primaryImage.url }}" alt=""></div>
+                  {% endif %}
+                  <div>
+                    <p style="font-family: var(--serif); font-size: 1.05rem; font-weight: 500;">{{ item.product.name }}</p>
+                    {% if item.variant %}<p class="meta">{{ item.variant.name }}</p>{% endif %}
+                  </div>
+                </div>
+              </td>
+              <td style="text-align:right; padding: 1.25rem 0;">{{ item.quantity }}</td>
+              <td style="text-align:right; padding: 1.25rem 0; font-weight: 600;">{{ item.totalPrice.amount }} {{ item.totalPrice.currency }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <a href="/products/" class="btn-link" style="margin-top: 1.5rem;">Keep browsing</a>
+      </div>
+
+      <aside style="border: 1px solid var(--rule); border-radius: 4px; padding: 2rem; background: var(--paper-2);">
+        <p class="eyebrow">Order summary</p>
+        <div style="margin-top: 1.5rem;">
+          <div style="display:flex; justify-content:space-between; padding: 0.5rem 0; color: var(--ink-2);">
+            <span>Subtotal</span><span>{{ cart.subtotal.amount }} {{ cart.subtotal.currency }}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding: 0.5rem 0; color: var(--muted); font-size: 0.9rem;">
+            <span>Shipping</span><span>Calculated at checkout</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding: 1rem 0; border-top: 1px solid var(--rule); font-family: var(--serif); font-size: 1.25rem; font-weight: 600; margin-top: 1rem;">
+            <span>Total</span><span>{{ cart.subtotal.amount }} {{ cart.subtotal.currency }}</span>
+          </div>
+        </div>
+        <a href="/checkout/" class="btn btn-primary" style="width:100%; justify-content: center; margin-top: 1.25rem;">Checkout</a>
+        <p class="meta" style="text-align:center; margin-top: 1rem;">Free shipping over $40<span class="text-accent">.</span></p>
+      </aside>
+    </div>
+    <style>@media (min-width: 900px) { .cart-grid { grid-template-columns: 1.4fr 0.6fr !important; gap: 4rem !important; align-items: start; } }</style>
+
+    {% else %}
+    <div style="text-align: center; padding: 6rem 2rem; border: 1px dashed var(--rule); border-radius: 4px;">
+      <p class="display display-m" style="margin: 0 0 1rem;">Your shelf is bare<span class="text-accent">.</span></p>
+      <p class="lede" style="margin: 0 auto 2rem;">Nothing to ship yet. Browse the shelf and pick a book or two.</p>
+      <a href="/products/" class="btn btn-primary">Browse the shelf</a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
