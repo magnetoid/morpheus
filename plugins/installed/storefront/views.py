@@ -342,3 +342,131 @@ def coming_soon(request, slug=None):
     return render(request, 'storefront/coming_soon.html', {
         'page_title': title_map.get(page_slug, page_slug.replace('-', ' ').title()),
     })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Customer account v2 — addresses, profile, returns
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _login_required(request, target):
+    if not request.user.is_authenticated:
+        from django.shortcuts import redirect as _redirect
+        return _redirect(f'/accounts/login/?next={target}')
+    return None
+
+
+def account_profile(request):
+    redirect_resp = _login_required(request, '/account/profile/')
+    if redirect_resp is not None:
+        return redirect_resp
+    user = request.user
+    if request.method == 'POST':
+        for field in ('first_name', 'last_name'):
+            val = (request.POST.get(field) or '').strip()
+            if val:
+                setattr(user, field, val[:120])
+        new_email = (request.POST.get('email') or '').strip().lower()
+        if new_email and new_email != user.email:
+            user.email = new_email[:254]
+        user.save(update_fields=['first_name', 'last_name', 'email'])
+        from django.shortcuts import redirect as _redirect
+        return _redirect('storefront:account_profile')
+    return render(request, 'storefront/account_profile.html', {'user': user})
+
+
+def account_addresses(request):
+    redirect_resp = _login_required(request, '/account/addresses/')
+    if redirect_resp is not None:
+        return redirect_resp
+    addresses = list(request.user.addresses.all().order_by('-is_default', '-created_at'))
+    return render(request, 'storefront/account_addresses.html', {'addresses': addresses})
+
+
+def account_address_form(request, address_id=None):
+    redirect_resp = _login_required(request, '/account/addresses/')
+    if redirect_resp is not None:
+        return redirect_resp
+    from plugins.installed.customers.models import Address
+    address = None
+    if address_id:
+        from django.shortcuts import get_object_or_404
+        address = get_object_or_404(Address, id=address_id, customer=request.user)
+    if request.method == 'POST':
+        from django.shortcuts import redirect as _redirect
+        data = {
+            'first_name': (request.POST.get('first_name') or '')[:100],
+            'last_name': (request.POST.get('last_name') or '')[:100],
+            'company': (request.POST.get('company') or '')[:200],
+            'address_line1': (request.POST.get('address_line1') or '')[:255],
+            'address_line2': (request.POST.get('address_line2') or '')[:255],
+            'city': (request.POST.get('city') or '')[:100],
+            'state': (request.POST.get('state') or '')[:100],
+            'postal_code': (request.POST.get('postal_code') or '')[:20],
+            'country': (request.POST.get('country') or 'US')[:2].upper(),
+            'phone': (request.POST.get('phone') or '')[:30],
+            'is_default': bool(request.POST.get('is_default')),
+            'address_type': request.POST.get('address_type', 'shipping'),
+        }
+        if address is not None:
+            for k, v in data.items():
+                setattr(address, k, v)
+            address.save()
+        else:
+            Address.objects.create(customer=request.user, **data)
+        return _redirect('storefront:account_addresses')
+    return render(request, 'storefront/account_address_form.html', {'address': address})
+
+
+def account_address_delete(request, address_id):
+    redirect_resp = _login_required(request, '/account/addresses/')
+    if redirect_resp is not None:
+        return redirect_resp
+    from django.shortcuts import get_object_or_404, redirect as _redirect
+    from plugins.installed.customers.models import Address
+    address = get_object_or_404(Address, id=address_id, customer=request.user)
+    if request.method == 'POST':
+        address.delete()
+    return _redirect('storefront:account_addresses')
+
+
+def account_returns(request):
+    redirect_resp = _login_required(request, '/account/returns/')
+    if redirect_resp is not None:
+        return redirect_resp
+    try:
+        from plugins.installed.orders.refunds import ReturnRequest
+        rrs = list(ReturnRequest.objects.filter(
+            order__customer=request.user,
+        ).order_by('-created_at'))
+    except Exception:  # noqa: BLE001
+        rrs = []
+    return render(request, 'storefront/account_returns.html', {'returns': rrs})
+
+
+def account_order_return(request, order_number):
+    redirect_resp = _login_required(request, f'/account/orders/{order_number}/return/')
+    if redirect_resp is not None:
+        return redirect_resp
+    from django.shortcuts import get_object_or_404, redirect as _redirect
+    from plugins.installed.orders.models import Order
+    order = get_object_or_404(
+        Order.objects.prefetch_related('items'),
+        order_number=order_number, customer=request.user,
+    )
+    if request.method == 'POST':
+        from plugins.installed.orders.refunds import ReturnService
+        items = []
+        for item in order.items.all():
+            qty = int(request.POST.get(f'qty_{item.id}', 0) or 0)
+            if qty > 0:
+                items.append({'order_item_id': str(item.id), 'quantity': min(qty, item.quantity)})
+        if items:
+            ReturnService.create_request(
+                order=order, items=items,
+                reason=request.POST.get('reason', 'other'),
+                customer_note=(request.POST.get('note', '') or '')[:2000],
+                requested_by=request.user,
+            )
+        return _redirect('storefront:account_returns')
+    return render(request, 'storefront/account_order_return.html', {'order': order})

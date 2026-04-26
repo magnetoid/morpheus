@@ -1,0 +1,75 @@
+{% extends "storefront/base.html" %}
+{% block title %}{% if address %}Edit{% else %}New{% endif %} address — dot books{% endblock %}
+
+{% block content %}
+<section style="padding: 4rem 0 5rem;">
+  <div class="wrap" style="max-width: 600px;">
+    <p class="meta"><a href="/account/addresses/" style="color: var(--muted);">← Addresses</a></p>
+    <h1 class="display display-l" style="margin: .5rem 0 2rem;">
+      {% if address %}Edit address{% else %}New address{% endif %}<span class="text-accent">.</span>
+    </h1>
+
+    <form method="post" style="display: grid; gap: 1rem;">
+      {% csrf_token %}
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div>
+          <label class="meta" style="display:block; margin-bottom: .35rem;">First name</label>
+          <input type="text" name="first_name" required value="{{ address.first_name|default:'' }}" style="width:100%; height:44px; padding: 0 1rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper);">
+        </div>
+        <div>
+          <label class="meta" style="display:block; margin-bottom: .35rem;">Last name</label>
+          <input type="text" name="last_name" required value="{{ address.last_name|default:'' }}" style="width:100%; height:44px; padding: 0 1rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper);">
+        </div>
+      </div>
+      <div>
+        <label class="meta" style="display:block; margin-bottom: .35rem;">Company (optional)</label>
+        <input type="text" name="company" value="{{ address.company|default:'' }}" style="width:100%; height:44px; padding: 0 1rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper);">
+      </div>
+      <div>
+        <label class="meta" style="display:block; margin-bottom: .35rem;">Address line 1</label>
+        <input type="text" name="address_line1" required value="{{ address.address_line1|default:'' }}" style="width:100%; height:44px; padding: 0 1rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper);">
+      </div>
+      <div>
+        <label class="meta" style="display:block; margin-bottom: .35rem;">Address line 2 (optional)</label>
+        <input type="text" name="address_line2" value="{{ address.address_line2|default:'' }}" style="width:100%; height:44px; padding: 0 1rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper);">
+      </div>
+      <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem;">
+        <div>
+          <label class="meta" style="display:block; margin-bottom: .35rem;">City</label>
+          <input type="text" name="city" required value="{{ address.city|default:'' }}" style="width:100%; height:44px; padding: 0 1rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper);">
+        </div>
+        <div>
+          <label class="meta" style="display:block; margin-bottom: .35rem;">State / region</label>
+          <input type="text" name="state" value="{{ address.state|default:'' }}" style="width:100%; height:44px; padding: 0 1rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper);">
+        </div>
+        <div>
+          <label class="meta" style="display:block; margin-bottom: .35rem;">Postal code</label>
+          <input type="text" name="postal_code" required value="{{ address.postal_code|default:'' }}" style="width:100%; height:44px; padding: 0 1rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper);">
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div>
+          <label class="meta" style="display:block; margin-bottom: .35rem;">Country (2-letter)</label>
+          <input type="text" name="country" required maxlength="2" value="{{ address.country|default:'US' }}" style="width:100%; height:44px; padding: 0 1rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); text-transform: uppercase;">
+        </div>
+        <div>
+          <label class="meta" style="display:block; margin-bottom: .35rem;">Phone (optional)</label>
+          <input type="tel" name="phone" value="{{ address.phone|default:'' }}" style="width:100%; height:44px; padding: 0 1rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper);">
+        </div>
+      </div>
+      <div>
+        <label class="meta" style="display:block; margin-bottom: .35rem;">Address type</label>
+        <select name="address_type" style="width:100%; height:44px; padding: 0 1rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper);">
+          <option value="shipping" {% if address.address_type == "shipping" %}selected{% endif %}>Shipping</option>
+          <option value="billing" {% if address.address_type == "billing" %}selected{% endif %}>Billing</option>
+        </select>
+      </div>
+      <label class="meta" style="display:flex; align-items:center; gap: .5rem;">
+        <input type="checkbox" name="is_default" {% if address.is_default %}checked{% endif %}>
+        Make this my default {% if address.address_type == "billing" %}billing{% else %}shipping{% endif %} address
+      </label>
+      <div><button type="submit" class="btn btn-primary">Save address</button></div>
+    </form>
+  </div>
+</section>
+{% endblock %}

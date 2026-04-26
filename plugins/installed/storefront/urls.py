@@ -19,8 +19,15 @@ urlpatterns = [
 
     # Customer account
     path('account/', views.account_home, name='account_home'),
+    path('account/profile/', views.account_profile, name='account_profile'),
     path('account/orders/', views.account_orders, name='account_orders'),
     path('account/orders/<str:order_number>/', views.account_order_detail, name='account_order_detail'),
+    path('account/orders/<str:order_number>/return/', views.account_order_return, name='account_order_return'),
+    path('account/addresses/', views.account_addresses, name='account_addresses'),
+    path('account/addresses/new/', views.account_address_form, name='account_address_new'),
+    path('account/addresses/<uuid:address_id>/edit/', views.account_address_form, name='account_address_edit'),
+    path('account/addresses/<uuid:address_id>/delete/', views.account_address_delete, name='account_address_delete'),
+    path('account/returns/', views.account_returns, name='account_returns'),
 
     # Order confirmation (post-checkout)
     path('order/confirmation/<str:order_number>/', views.order_confirmation, name='order_confirmation'),
