@@ -74,6 +74,7 @@
     <a href="{% url 'admin_dashboard:home' %}" class="flex items-center gap-2 font-semibold tracking-tight">
       <i data-lucide="hexagon" class="h-5 w-5"></i>
       <span>Morpheus</span>
+      <span style="font-size:.65rem; font-weight:500; color:var(--text-muted); margin-left:.15rem; padding:.05rem .35rem; border:1px solid var(--border); border-radius:4px;">{{ MORPHEUS_VERSION|default:"v0.1.0" }}</span>
     </a>
     <button id="sidebar-close" class="md:hidden btn btn-ghost p-1.5"><i data-lucide="x" class="h-4 w-4"></i></button>
   </div>
@@ -89,29 +90,20 @@
     <a href="{% url 'admin_dashboard:ai_insights' %}" class="nav-link {% if active_nav == 'ai_insights' %}active{% endif %}"><i data-lucide="bar-chart" class="h-4 w-4"></i> Insights</a>
     <div class="nav-section">Sales channels</div>
     <a href="#" class="nav-link"><i data-lucide="globe" class="h-4 w-4"></i> Online store</a>
-    {% if dashboard_pages %}
-    <div class="nav-section">Plugins</div>
-    {% for page in dashboard_pages %}
+    {# Plugin-contributed pages, grouped by section. Each section header
+       only appears when at least one plugin contributes to it. #}
+    {% for section in sidebar_sections %}
+    <div class="nav-section">{{ section.label }}</div>
+    {% for page in section.pages %}
     <a href="/dashboard/apps/{{ page.plugin }}/{{ page.slug }}/" class="nav-link">
       <i data-lucide="{{ page.icon|default:'circle' }}" class="h-4 w-4"></i> {{ page.label }}
     </a>
     {% endfor %}
-    {% endif %}
+    {% endfor %}
     <div class="nav-section">Apps &amp; settings</div>
     <a href="{% url 'admin_dashboard:apps' %}"     class="nav-link {% if active_nav == 'apps' %}active{% endif %}"><i data-lucide="grid-3x3" class="h-4 w-4"></i> Apps</a>
     <a href="{% url 'admin_dashboard:settings' %}" class="nav-link {% if active_nav == 'settings' %}active{% endif %}"><i data-lucide="settings" class="h-4 w-4"></i> Settings</a>
   </nav>
-  <div class="border-t border-[color:var(--border)] px-3 py-3">
-    <div class="flex items-center gap-2.5">
-      <div class="h-8 w-8 rounded-full bg-[color:var(--primary)] text-[color:var(--primary-fg)] flex items-center justify-center text-xs font-bold">
-        {{ request.user.email|slice:":1"|upper }}
-      </div>
-      <div class="min-w-0">
-        <p class="text-sm font-medium truncate">{{ request.user.email|default:"Staff" }}</p>
-        <p class="text-xs text-[color:var(--text-muted)]">Admin</p>
-      </div>
-    </div>
-  </div>
 </aside>
 
 <div class="flex-1 flex flex-col min-w-0">
@@ -121,8 +113,28 @@
       <i data-lucide="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[color:var(--text-subtle)]"></i>
       <input type="text" placeholder="Search orders, products, customers…" class="input input-search">
     </div>
-    <a href="{% url 'admin_dashboard:settings' %}" class="btn btn-ghost p-1.5"><i data-lucide="settings" class="h-4 w-4"></i></a>
-    <button class="btn btn-ghost p-1.5"><i data-lucide="bell" class="h-4 w-4"></i></button>
+    <a href="{% url 'admin_dashboard:settings' %}" class="btn btn-ghost p-1.5" aria-label="Settings"><i data-lucide="settings" class="h-4 w-4"></i></a>
+    <button class="btn btn-ghost p-1.5" aria-label="Notifications"><i data-lucide="bell" class="h-4 w-4"></i></button>
+    {# User menu — top-right. Click to open dropdown. #}
+    <div id="user-menu" style="position: relative;">
+      <button id="user-menu-toggle" type="button" aria-label="Account" style="
+          display: inline-flex; align-items: center; gap: .5rem; padding: .25rem .5rem .25rem .25rem;
+          border: 1px solid var(--border); border-radius: 999px; background: var(--surface); cursor: pointer;">
+        <span class="h-7 w-7 rounded-full bg-[color:var(--primary)] text-[color:var(--primary-fg)] flex items-center justify-center text-xs font-bold">
+          {{ request.user.email|slice:":1"|upper }}
+        </span>
+        <span class="text-sm hidden md:inline" style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ request.user.email|default:"Staff" }}</span>
+        <i data-lucide="chevron-down" class="h-3 w-3 hidden md:inline text-[color:var(--text-muted)]"></i>
+      </button>
+      <div id="user-menu-panel" style="display:none; position:absolute; right:0; top: calc(100% + .35rem); min-width: 220px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-pop); z-index: 50; padding: .35rem;">
+        <p style="padding:.5rem .65rem; font-size:.75rem; color: var(--text-muted); border-bottom: 1px solid var(--border); margin-bottom:.25rem;">
+          Signed in as<br><strong style="color:var(--text);">{{ request.user.email|default:"Staff" }}</strong>
+        </p>
+        <a href="/admin/" class="nav-link" style="font-size:.85rem;"><i data-lucide="shield" class="h-4 w-4"></i> Django admin</a>
+        <a href="{% url 'admin_dashboard:settings' %}" class="nav-link" style="font-size:.85rem;"><i data-lucide="settings" class="h-4 w-4"></i> Settings</a>
+        <a href="/accounts/logout/" class="nav-link" style="font-size:.85rem;"><i data-lucide="log-out" class="h-4 w-4"></i> Sign out</a>
+      </div>
+    </div>
   </header>
 
   <main class="flex-1 overflow-y-auto p-4 lg:p-6">
@@ -140,6 +152,11 @@
     document.getElementById('sidebar-open')?.addEventListener('click', open);
     document.getElementById('sidebar-close')?.addEventListener('click', close);
     bd.addEventListener('click', close);
+    // User menu dropdown
+    const utoggle = document.getElementById('user-menu-toggle');
+    const upanel = document.getElementById('user-menu-panel');
+    utoggle?.addEventListener('click', e => { e.stopPropagation(); upanel.style.display = upanel.style.display === 'block' ? 'none' : 'block'; });
+    document.addEventListener('click', e => { if (upanel && !document.getElementById('user-menu')?.contains(e.target)) upanel.style.display = 'none'; });
   })();
 </script>
 {# The hard-coded Morpheus Assistant — always present in admin. #}

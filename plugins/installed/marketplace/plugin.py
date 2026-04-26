@@ -27,3 +27,23 @@ class MarketplacePlugin(MorpheusPlugin):
             split_order(order)
         except Exception as e:  # noqa: BLE001 — never block order placement
             logger.warning('marketplace: split_order failed for %s: %s', order.id, e, exc_info=True)
+
+    def contribute_dashboard_pages(self) -> list:
+        from plugins.contributions import DashboardPage
+        return [
+            DashboardPage(
+                label='Vendors', slug='vendors',
+                view='plugins.installed.marketplace.dashboard.vendors_list',
+                icon='store', section='marketplace', order=10,
+            ),
+            DashboardPage(
+                label='Vendor orders', slug='orders',
+                view='plugins.installed.marketplace.dashboard.vendor_orders',
+                icon='shopping-bag', section='marketplace', order=20,
+            ),
+            DashboardPage(
+                label='Payouts', slug='payouts',
+                view='plugins.installed.marketplace.dashboard.payouts',
+                icon='wallet', section='marketplace', order=30,
+            ),
+        ]

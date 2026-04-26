@@ -84,6 +84,10 @@ class MorpheusTheme:
     supports_plugins: list[str] = []       # plugin names this theme styles
     requires_plugins: list[str] = []       # plugins that MUST be active
 
+    # Topic for the demo_data random product generator. Built-ins:
+    # 'bookstore' | 'apparel' | 'general'. Empty falls back to 'general'.
+    demo_topic: str = ''
+
     # ── Internal ──────────────────────────────────────────────────────────────
     _config_cache: dict | None = None
 

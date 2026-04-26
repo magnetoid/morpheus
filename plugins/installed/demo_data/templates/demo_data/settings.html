@@ -1,0 +1,76 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Demo data · Morpheus admin{% endblock %}
+
+{% block content %}
+<a href="/dashboard/settings/#pane=plugin-demo_data" class="text-sm text-[color:var(--text-muted)]">← Settings</a>
+<h1 class="text-xl font-semibold mt-2 mb-4">Demo data</h1>
+
+{% if messages %}
+{% for m in messages %}
+<div class="card card-padded mb-3" style="border-left: 4px solid {% if m.tags == 'error' %}var(--danger){% else %}var(--success){% endif %};">
+  <p class="text-sm">{{ m }}</p>
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="card card-padded mb-4">
+  <p class="text-sm text-[color:var(--text-muted)] mb-3">
+    Detected topic from active theme: <strong>{{ detected_topic }}</strong>.
+    Random products will be themed accordingly. Built-in topics:
+    <code>bookstore</code>, <code>apparel</code>, <code>general</code>.
+  </p>
+
+  <form method="post" style="display: grid; gap: 1rem; max-width: 480px;">
+    {% csrf_token %}
+    <div>
+      <label class="block text-sm font-medium mb-1">How many products?</label>
+      <input type="number" name="count" min="1" max="40" value="30" class="input">
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">Topic override (optional)</label>
+      <input type="text" name="topic" placeholder="(auto: {{ detected_topic }})" class="input">
+    </div>
+    <div>
+      <button type="submit" name="action" value="random" class="btn btn-primary">
+        Generate random products
+      </button>
+    </div>
+  </form>
+</div>
+
+<div class="card card-padded mb-4">
+  <h2 class="text-base font-semibold mb-2">Full bookstore demo</h2>
+  <p class="text-sm text-[color:var(--text-muted)] mb-3">
+    Loads the original 25-book bookstore fixture (categories, collections,
+    vendors, customers, orders). Idempotent.
+  </p>
+  <form method="post">
+    {% csrf_token %}
+    <label class="text-sm" style="display: inline-flex; align-items: center; gap: .35rem; margin-right: 1rem;">
+      <input type="checkbox" name="wipe"> Wipe demo first
+    </label>
+    <button type="submit" name="action" value="full" class="btn">Seed full demo</button>
+  </form>
+</div>
+
+<div class="card card-padded">
+  <h2 class="text-base font-semibold mb-2" style="color: var(--danger);">Wipe random demo</h2>
+  <p class="text-sm text-[color:var(--text-muted)] mb-3">
+    Removes only products tagged with <code>metadata.is_random_demo=True</code>.
+    Real products and the bookstore fixture are not affected.
+  </p>
+  <form method="post" onsubmit="return confirm('Delete all random demo products?');">
+    {% csrf_token %}
+    <button type="submit" name="action" value="wipe_random" class="btn" style="border-color: var(--danger); color: var(--danger);">
+      Wipe random demo
+    </button>
+  </form>
+</div>
+
+{% if last_summary %}
+<div class="card card-padded mt-4">
+  <h2 class="text-base font-semibold mb-2">Last run</h2>
+  <pre style="font-size: .8rem; white-space: pre-wrap;">{{ last_summary.counts }}</pre>
+</div>
+{% endif %}
+{% endblock %}

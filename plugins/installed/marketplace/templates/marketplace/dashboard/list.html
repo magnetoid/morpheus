@@ -1,0 +1,26 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}{{ title }} · Morpheus admin{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">{{ title }}</h1>
+<div class="card">
+  <table class="morph-table">
+    <thead><tr>{% for c in columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        {% for c in columns %}
+        <td>
+          {% with val=r|stringformat:'s' %}{{ val|truncatechars:80 }}{% endwith %}
+        </td>
+        {% endfor %}
+      </tr>
+    {% empty %}
+      <tr><td colspan="{{ columns|length }}" style="text-align:center; padding:2rem; color:var(--text-muted);">
+        No rows yet.
+      </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

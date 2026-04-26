@@ -206,3 +206,132 @@ def _wipe_demo(summary: SeedSummary) -> None:
     Vendor.objects.filter(slug__in=[v['slug'] for v in seeds.VENDORS]).delete()
     Order.objects.filter(source='demo').delete()
     summary.inc('wiped', 1)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Random-product generator (theme-aware)
+# ─────────────────────────────────────────────────────────────────────────────
+
+import random
+import secrets
+
+
+_TOPIC_PRODUCTS = {
+    'bookstore': {
+        'category': 'Random reads',
+        'price_range': (Decimal('12'), Decimal('38')),
+        'titles': [
+            'The Quiet Hour', 'Letters from a Distant Garden', 'Anatomy of Patience',
+            'On Solitude and Other Habits', 'The Architecture of Memory',
+            'Small Animals at Dawn', 'A Catalogue of Lost Names', 'Four Seasons in Lisbon',
+            'How to Read a Window', 'The Long Sentence', 'Notebook of Salt',
+            'Rooms in the Margin', 'A Theory of Walking', 'Almost Nothing Happens',
+            'Field Guide to the Familiar', 'The Translator\'s Confession',
+            'Late Apricots', 'Inventory of Departures', 'A Brief History of Hesitation',
+            'The Last Bookshop in Town', 'Coastal Disturbances', 'Houses That Outlive Us',
+            'On the Use of Quiet', 'The Slowest Marathon', 'A Year of Empty Mornings',
+            'Letters Never Sent', 'Notes from the Greenhouse', 'The Cartographer\'s Daughter',
+            'Wintering in Prose', 'A Practical Guide to Stillness',
+        ],
+    },
+    'apparel': {
+        'category': 'Capsule pieces',
+        'price_range': (Decimal('45'), Decimal('220')),
+        'titles': [
+            'Heritage Linen Shirt', 'Field Trouser', 'Boxy Cardigan',
+            'Slate Wool Blazer', 'Selvedge Denim', 'Sailcloth Tote',
+            'Workwear Coat', 'Collarless Shirt', 'Drawcord Trouser',
+            'Heavyweight Tee', 'Felted Cap', 'Dyed Cotton Scarf',
+            'Slow Knit Pullover', 'Yarn-dyed Twill Pant', 'Reverse Sweat',
+            'Crewneck in Charcoal', 'Pleated Wide Trouser', 'Half-zip Pullover',
+            'Engineer Cap', 'Box Pocket Shirt', 'Three-button Knit',
+            'French-seam Tee', 'Lightweight Coat', 'Oversized Knit',
+            'Hopsack Trouser', 'Garment-dyed Hoodie', 'Cropped Anorak',
+            'Selvedge Shorts', 'Field Vest', 'Boxy Overshirt',
+        ],
+    },
+    'general': {
+        'category': 'Sample products',
+        'price_range': (Decimal('15'), Decimal('120')),
+        'titles': [f'Sample product #{i:02d}' for i in range(1, 41)],
+    },
+}
+
+
+def _detect_topic() -> str:
+    """Best-effort: read the active theme's `demo_topic` attribute.
+    Falls back to 'bookstore' for dot_books, else 'general'."""
+    try:
+        from django.conf import settings as dj_settings
+        from themes.registry import theme_registry
+
+        active_name = getattr(dj_settings, 'MORPHEUS_ACTIVE_THEME', '')
+        theme = theme_registry.get(active_name) if active_name else None
+        if theme is not None:
+            topic = getattr(theme, 'demo_topic', None)
+            if topic:
+                return topic
+            if 'book' in (active_name or '').lower():
+                return 'bookstore'
+    except Exception:  # noqa: BLE001
+        pass
+    return 'general'
+
+
+def seed_random_products(*, count: int = 30, topic: str = '',
+                         currency: str = 'USD',
+                         wipe_random: bool = False) -> SeedSummary:
+    """Generate N random products themed for the active storefront.
+
+    Idempotent across runs at the title level — adding more re-runs only
+    adds *new* titles. Set `wipe_random=True` to remove products with the
+    `is_random_demo=True` metadata flag first.
+
+    Args:
+        count: how many products to ensure.
+        topic: 'bookstore' | 'apparel' | 'general'. Auto-detected if empty.
+        currency: ISO currency.
+        wipe_random: if True, delete previously-generated random demo first.
+    """
+    from django.utils.text import slugify
+    from plugins.installed.catalog.models import Category, Product
+
+    summary = SeedSummary()
+    chosen_topic = topic or _detect_topic()
+    spec = _TOPIC_PRODUCTS.get(chosen_topic, _TOPIC_PRODUCTS['general'])
+    titles = list(spec['titles'])
+    random.shuffle(titles)
+    count = max(1, min(int(count or 30), len(titles)))
+
+    if wipe_random:
+        deleted, _ = Product.objects.filter(metadata__is_random_demo=True).delete()
+        summary.inc('random_demo_wiped', deleted)
+
+    cat, _ = Category.objects.get_or_create(
+        slug=slugify(spec['category']),
+        defaults={'name': spec['category'], 'is_active': True},
+    )
+    summary.inc('categories', 1 if _ else 0)
+
+    low, high = spec['price_range']
+    for title in titles[:count]:
+        slug = slugify(title) + '-' + secrets.token_hex(2)
+        # make pricing predictable but varied
+        price = (low + (high - low) * Decimal(random.random())).quantize(Decimal('0.01'))
+        product, created = Product.objects.get_or_create(
+            slug=slug,
+            defaults={
+                'name': title,
+                'sku': f'RD-{secrets.token_hex(4).upper()}',
+                'category': cat,
+                'short_description': f'Generated demo product · {chosen_topic}',
+                'price': Money(price, currency),
+                'status': 'active',
+                'metadata': {'is_random_demo': True, 'topic': chosen_topic},
+            },
+        )
+        if created:
+            summary.inc('products', 1)
+    summary.counts.setdefault('topic', chosen_topic)
+    summary.counts.setdefault('count_requested', count)
+    return summary

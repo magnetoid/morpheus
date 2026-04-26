@@ -8,6 +8,7 @@ def store_settings(request):
         'STORE_CURRENCY': django_settings.STORE_CURRENCY,
         'STORE_COUNTRY': django_settings.STORE_COUNTRY,
         'DEBUG': django_settings.DEBUG,
+        'MORPHEUS_VERSION': getattr(django_settings, 'MORPHEUS_VERSION', 'v0.1.0'),
     }
 
 
