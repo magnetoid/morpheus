@@ -68,6 +68,7 @@ MORPHEUS_DEFAULT_PLUGINS = [
     'plugins.installed.b2b',
     'plugins.installed.subscriptions',
     'plugins.installed.cms',
+    'plugins.installed.rbac',
 ]
 
 # ── Extra plugins installed by merchant via .env ───────────────────────────────
