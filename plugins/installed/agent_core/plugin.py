@@ -51,6 +51,21 @@ class AgentCorePlugin(MorpheusPlugin):
             prefix='dashboard/agents/',
             namespace='agent_core_dash',
         )
+        self._register_beat_schedule()
+
+    def _register_beat_schedule(self) -> None:
+        from django.conf import settings
+        from celery.schedules import crontab
+        schedule = getattr(settings, 'CELERY_BEAT_SCHEDULE', None)
+        if schedule is None:
+            return
+        schedule.setdefault(
+            'agent_core.background_agents_tick',
+            {
+                'task': 'plugins.installed.agent_core.tasks.background_agents_tick',
+                'schedule': crontab(minute='*'),
+            },
+        )
 
     # ── Contribution surfaces ─────────────────────────────────────────────────
 
@@ -88,6 +103,15 @@ class AgentCorePlugin(MorpheusPlugin):
                 icon='terminal',
                 section='ai',
                 order=20,
+            ),
+            DashboardPage(
+                label='Background agents',
+                slug='background',
+                view='plugins.installed.agent_core.views.background_agents_view',
+                icon='clock',
+                section='ai',
+                order=30,
+                description='Schedule autonomous agent runs (digests, monitors, sweeps).',
             ),
         ]
 
