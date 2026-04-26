@@ -143,11 +143,10 @@
 
     {# Every plugin's settings panel becomes its own entry here. #}
     <div class="nav-section">Plugins</div>
-    {% for plugin in plugin_registry.active_plugins %}
-      {% with panel=plugin_registry|default:None %}{% endwith %}
-    {% endfor %}
-    {% for name, panel in plugin_registry._settings_panels.items %}
-    <a href="/dashboard/apps/{{ name }}/settings/" class="nav-link"><i data-lucide="settings" class="h-4 w-4"></i> {{ panel.label }}</a>
+    {% for entry in plugin_settings_panels %}
+    <a href="/dashboard/apps/{{ entry.plugin }}/settings/" class="nav-link">
+      <i data-lucide="settings" class="h-4 w-4"></i> {{ entry.panel.label }}
+    </a>
     {% endfor %}
 
     <div style="margin-top:auto;"></div>

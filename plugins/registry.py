@@ -227,6 +227,13 @@ class PluginRegistry:
     def settings_panel(self, plugin_name: str):
         return self._settings_panels.get(plugin_name)
 
+    def all_settings_panels(self) -> list:
+        """Sorted list of (plugin_name, SettingsPanel) tuples — template-safe."""
+        return [
+            {'plugin': name, 'panel': panel}
+            for name, panel in sorted(self._settings_panels.items(), key=lambda kv: kv[0])
+        ]
+
     def _get_enabled_from_db(self) -> set[str]:
         from django.db import DatabaseError
         try:

@@ -62,6 +62,8 @@ def plugin_context(request):
     return {
         'active_plugins': plugin_registry._active,
         'plugin_registry': plugin_registry,
-        'dashboard_pages': pages,           # back-compat flat list
+        'dashboard_pages': pages,             # back-compat flat list
         'sidebar_sections': sidebar_sections,  # grouped + ordered
+        # Template-safe accessor for the unified Settings sidebar.
+        'plugin_settings_panels': plugin_registry.all_settings_panels(),
     }
