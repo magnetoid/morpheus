@@ -58,9 +58,25 @@ def _check_audience(request, agent_name: str):
     return None
 
 
+def _agent_rate_key(request):
+    user = getattr(request, 'user', None)
+    if user is not None and getattr(user, 'is_authenticated', False):
+        return f'agent:user:{user.pk}'
+    return f'agent:ip:{request.META.get("REMOTE_ADDR", "0.0.0.0")}'
+
+
 @csrf_exempt
 @require_http_methods(['POST'])
 def invoke_agent_view(request, agent_name: str):
+    from core.utils.rate_limit import RateLimitExceeded, check_and_consume
+    from django.http import HttpResponse
+    try:
+        check_and_consume(key=_agent_rate_key(request), max_per_window=20, window_seconds=60)
+    except RateLimitExceeded as e:
+        resp = HttpResponse('Agent rate limit exceeded.', status=429)
+        resp['Retry-After'] = str(e.retry_after)
+        return resp
+
     denied = _check_audience(request, agent_name)
     if denied is not None:
         return denied

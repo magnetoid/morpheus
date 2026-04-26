@@ -1,0 +1,45 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Bulk CSV import / export · Morpheus{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-2">Bulk CSV products</h1>
+<p class="meta mb-4">Header row required. Recognised columns:
+  <code>sku, name, slug, price, currency, status, short_description, description,
+  weight, category_slug, is_featured, compare_at_price</code>. Rows are upserted by SKU when present, else by slug.</p>
+
+{% if error %}
+<div class="card card-padded" style="border-color:var(--danger);margin-bottom:1rem;">
+  <strong>Import failed.</strong> {{ error }}
+</div>
+{% endif %}
+
+{% if summary %}
+<div class="card card-padded" style="margin-bottom:1rem;">
+  <strong>Imported.</strong>
+  <ul style="margin-top:.5rem;">
+    {% for k, v in summary.counts.items %}<li>{{ k }}: {{ v }}</li>{% endfor %}
+  </ul>
+  {% if summary.errors %}
+  <p class="meta" style="margin-top:.5rem;">Errors:</p>
+  <ul style="font-size:.8rem;color:var(--danger);">
+    {% for e in summary.errors %}<li>{{ e }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card card-padded mb-4">
+  <h2 class="text-base font-semibold mb-2">Import</h2>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="file" name="csv" accept=".csv,text/csv" required>
+    <button type="submit" class="btn btn-primary">Import CSV</button>
+  </form>
+</div>
+
+<div class="card card-padded">
+  <h2 class="text-base font-semibold mb-2">Export</h2>
+  <p class="meta">Download every product as CSV.</p>
+  <a href="/dashboard/import/csv/export/" class="btn">Download products.csv</a>
+</div>
+{% endblock %}
