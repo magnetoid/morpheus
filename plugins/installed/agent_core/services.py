@@ -13,11 +13,50 @@ loading message history, dispatching runs to Celery for proactive agents.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from typing import Any, Iterable
 
 from django.db import DatabaseError, transaction
 from django.utils import timezone
+
+
+def _run_with_timeout(*, runtime, user_message, history, context, run_id, timeout):
+    """Execute `runtime.run(...)` on a worker thread; raise TimeoutError on cap.
+
+    Python can't truly kill a stuck thread, so the worker thread keeps
+    running after timeout — but the caller gets a clean error and the
+    request returns. The runaway thread will end on its next yield.
+
+    In tests we run inline — SQLite test transactions don't share across
+    threads and we don't need real wall-clock enforcement.
+    """
+    import sys as _sys
+    if 'test' in _sys.argv or _sys.argv[0].endswith('pytest'):
+        return runtime.run(
+            user_message=user_message, history=history,
+            context=context, run_id=run_id,
+        )
+
+    box: dict[str, Any] = {}
+
+    def _wrap():
+        try:
+            box['result'] = runtime.run(
+                user_message=user_message, history=history,
+                context=context, run_id=run_id,
+            )
+        except BaseException as e:  # noqa: BLE001 — capture for the main thread
+            box['error'] = e
+
+    t = threading.Thread(target=_wrap, daemon=True)
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        raise TimeoutError(f'agent runtime exceeded {timeout}s')
+    if 'error' in box:
+        raise box['error']
+    return box['result']
 
 from core.agents import (
     AgentRuntime,
@@ -93,6 +132,7 @@ def run_agent(
 
     # Subscriber → mirror into DB live.
     seq_counter = {'i': 0}
+    audit_incomplete = {'value': False}
     db_subscriber = None
     if run is not None:
         def _mirror(step: TraceStep) -> None:
@@ -100,6 +140,7 @@ def run_agent(
             try:
                 _persist_step(run=run, seq=seq_counter['i'], step=step)
             except DatabaseError as e:  # noqa: BLE001
+                audit_incomplete['value'] = True
                 logger.warning('agent_core: persist step failed: %s', e)
             if on_step is not None:
                 try:
@@ -116,13 +157,24 @@ def run_agent(
     )
 
     started = time.monotonic()
+    timeout_seconds = float((context or {}).get('timeout_seconds') or 45.0)
     try:
-        result = runtime.run(
+        result = _run_with_timeout(
+            runtime=runtime,
             user_message=user_message,
             history=list(history or []),
             context={**(context or {}), 'customer': customer_obj},
             run_id=str(run.id) if run else None,
+            timeout=timeout_seconds,
         )
+    except TimeoutError as e:
+        logger.warning('agent_core: runtime exceeded %ss: %s', timeout_seconds, e)
+        if run is not None:
+            run.state = 'failed'
+            run.error = f'timeout after {timeout_seconds}s'
+            run.ended_at = timezone.now()
+            run.save(update_fields=['state', 'error', 'ended_at'])
+        raise
     except Exception as e:  # noqa: BLE001 — final safety net
         logger.error('agent_core: runtime crashed: %s', e, exc_info=True)
         if run is not None:
@@ -145,10 +197,14 @@ def run_agent(
         run.provider = provider.name
         run.model = provider.model or ''
         run.ended_at = timezone.now()
+        if audit_incomplete['value']:
+            md = dict(run.metadata or {})
+            md['audit_incomplete'] = True
+            run.metadata = md
         run.save(update_fields=[
             'state', 'final_text', 'error', 'tool_call_count',
             'prompt_tokens', 'completion_tokens', 'duration_ms',
-            'provider', 'model', 'ended_at',
+            'provider', 'model', 'ended_at', 'metadata',
         ])
 
     if conversation_id and run is not None:

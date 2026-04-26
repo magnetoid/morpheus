@@ -70,7 +70,9 @@ class MorpheusAgent:
     requires_approval: bool = False  # blanket approval gate (per-tool gates also exist)
 
     # Tools — concrete tool list, populated by `get_tools()` at runtime.
-    default_tools: list[Tool] = []
+    # Tuple, NOT list, so accidental .append() on the class default raises
+    # rather than silently bleeding tools across sibling agent classes.
+    default_tools: tuple[Tool, ...] = ()
 
     # ── Class-time validation ──────────────────────────────────────────────────
 

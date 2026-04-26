@@ -38,11 +38,32 @@ def _decode_body(request) -> dict[str, Any]:
     return dict(request.POST.items())
 
 
+def _check_audience(request, agent_name: str):
+    """Audience-policy gate. Returns a JsonResponse on denial, else None.
+
+    - audience='system'      → never invokable via HTTP
+    - audience='merchant'    → must be authenticated + is_staff
+    - audience='storefront'  → public (rate-limited via DRF middleware)
+    - audience='any'         → public
+    """
+    agent = agent_registry.get_agent(agent_name)
+    if agent is None:
+        return JsonResponse({'error': f'Unknown agent: {agent_name}'}, status=404)
+    if agent.audience == 'system':
+        return JsonResponse({'error': 'System agents cannot be invoked via HTTP.'}, status=403)
+    if agent.audience == 'merchant':
+        user = getattr(request, 'user', None)
+        if user is None or not user.is_authenticated or not getattr(user, 'is_staff', False):
+            return JsonResponse({'error': 'Staff authentication required.'}, status=403)
+    return None
+
+
 @csrf_exempt
 @require_http_methods(['POST'])
 def invoke_agent_view(request, agent_name: str):
-    if agent_registry.get_agent(agent_name) is None:
-        return JsonResponse({'error': f'Unknown agent: {agent_name}'}, status=404)
+    denied = _check_audience(request, agent_name)
+    if denied is not None:
+        return denied
     body = _decode_body(request)
     message = (body.get('message') or '').strip()
     if not message:
@@ -85,8 +106,9 @@ def stream_agent_view(request, agent_name: str):
     The runtime executes on a worker thread; the view drains a queue and
     writes one event per `TraceStep` until the run finishes.
     """
-    if agent_registry.get_agent(agent_name) is None:
-        return JsonResponse({'error': f'Unknown agent: {agent_name}'}, status=404)
+    denied = _check_audience(request, agent_name)
+    if denied is not None:
+        return denied
     body = _decode_body(request)
     message = (body.get('message') or '').strip()
     if not message:

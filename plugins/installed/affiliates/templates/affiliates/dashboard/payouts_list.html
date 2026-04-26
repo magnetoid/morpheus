@@ -1,0 +1,29 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Payouts · Morpheus admin{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">Affiliate payouts</h1>
+<div class="card">
+  <table class="morph-table">
+    <thead>
+      <tr><th>Created</th><th>Affiliate</th><th>Amount</th><th>Method</th><th>Status</th><th>Reference</th></tr>
+    </thead>
+    <tbody>
+      {% for p in payouts %}
+      <tr>
+        <td>{{ p.created_at|date:"M j, H:i" }}</td>
+        <td>{{ p.affiliate.code }}</td>
+        <td>{{ p.amount }}</td>
+        <td>{{ p.method }}</td>
+        <td>
+          <span class="pill {% if p.status == 'paid' %}pill-success{% elif p.status == 'pending' %}pill-warn{% else %}pill-neutral{% endif %}">{{ p.status }}</span>
+        </td>
+        <td><code>{{ p.external_reference|default:"—" }}</code></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" style="text-align:center; padding: 2rem; color: var(--text-muted);">No payouts yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

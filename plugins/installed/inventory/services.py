@@ -27,6 +27,10 @@ from plugins.installed.inventory.models import StockLevel, StockMovement
 logger = logging.getLogger('morpheus.inventory')
 
 
+class InsufficientStockError(RuntimeError):
+    """Raised when a reservation would exceed available_quantity."""
+
+
 class InventoryService:
 
     @classmethod
@@ -77,10 +81,12 @@ class InventoryService:
                             item.variant_id, order.order_number,
                         )
                         continue
+                    # Re-check inside the lock to avoid the race that lets two
+                    # concurrent orders both pass an outside-the-lock check.
                     if sl.available_quantity < item.quantity:
-                        logger.warning(
-                            'inventory: short stock for %s — wanted %s, available %s',
-                            item.variant_id, item.quantity, sl.available_quantity,
+                        raise InsufficientStockError(
+                            f'Short stock for variant {item.variant_id}: '
+                            f'wanted {item.quantity}, available {sl.available_quantity}'
                         )
                     sl.reserved_quantity = (sl.reserved_quantity or 0) + item.quantity
                     sl.save(update_fields=['reserved_quantity', 'updated_at'])

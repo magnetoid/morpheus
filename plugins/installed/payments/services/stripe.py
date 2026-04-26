@@ -27,10 +27,14 @@ class PaymentService:
         amount_cents = int(order.total.amount * 100)
         
         try:
+            # idempotency_key prevents duplicate intents on retry — if Stripe
+            # has already seen the same key + amount, it returns the original
+            # intent instead of charging twice.
             intent = stripe.PaymentIntent.create(
                 amount=amount_cents,
                 currency=order.total.currency.code.lower(),
                 metadata={'order_id': str(order.id), 'order_number': order.order_number},
+                idempotency_key=f'pi-{order.id}-{amount_cents}',
             )
             
             # Record the pending transaction
