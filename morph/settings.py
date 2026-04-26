@@ -141,6 +141,7 @@ MIDDLEWARE = [
     'api.rate_limit.RateLimitMiddleware',
     'plugins.installed.environments.middleware.EnvironmentMiddleware',
     'plugins.installed.seo.middleware.SeoRedirectMiddleware',
+    'plugins.installed.analytics.middleware.AnalyticsMiddleware',
     'core.request_id.RequestIdMiddleware',
 ]
 

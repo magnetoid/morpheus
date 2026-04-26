@@ -1,0 +1,75 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Real-time · Morpheus{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">Real-time</h1>
+
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Sessions</p>
+    <p id="rt-sessions" class="text-2xl font-semibold mt-1">{{ data.sessions }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Events</p>
+    <p id="rt-events" class="text-2xl font-semibold mt-1">{{ data.events }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Pageviews</p>
+    <p id="rt-pv" class="text-2xl font-semibold mt-1">{{ data.pageviews }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Cart adds</p>
+    <p id="rt-cart" class="text-2xl font-semibold mt-1">{{ data.cart_adds }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Orders</p>
+    <p id="rt-orders" class="text-2xl font-semibold mt-1">{{ data.orders }}</p>
+  </div>
+</div>
+
+<div class="card">
+  <table class="morph-table">
+    <thead><tr><th>When</th><th>Event</th><th>URL</th><th>Product</th><th>Search</th></tr></thead>
+    <tbody id="rt-feed">
+    {% for r in data.recent %}
+    <tr>
+      <td>{{ r.created_at|time:"H:i:s" }}</td>
+      <td><span class="pill pill-neutral">{{ r.kind }}</span> {{ r.name }}</td>
+      <td><code style="font-size:.8rem;">{{ r.url|truncatechars:60 }}</code></td>
+      <td>{{ r.product_slug|default:"—" }}</td>
+      <td>{{ r.search_query|default:"—" }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">Quiet right now.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+(function() {
+  function refresh() {
+    fetch('/api/analytics/realtime.json?minutes=5')
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById('rt-sessions').textContent = d.sessions;
+        document.getElementById('rt-events').textContent = d.events;
+        document.getElementById('rt-pv').textContent = d.pageviews;
+        document.getElementById('rt-cart').textContent = d.cart_adds;
+        document.getElementById('rt-orders').textContent = d.orders;
+        var tbody = document.getElementById('rt-feed');
+        if (!d.recent || !d.recent.length) return;
+        tbody.innerHTML = d.recent.map(r => `<tr>
+          <td>${(r.created_at || '').slice(11,19)}</td>
+          <td><span class="pill pill-neutral">${r.kind}</span> ${r.name}</td>
+          <td><code style="font-size:.8rem;">${(r.url || '').slice(0,60)}</code></td>
+          <td>${r.product_slug || '—'}</td>
+          <td>${r.search_query || '—'}</td>
+        </tr>`).join('');
+      })
+      .catch(() => {});
+  }
+  setInterval(refresh, 5000);
+})();
+</script>
+{% endblock %}
