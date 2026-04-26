@@ -30,3 +30,19 @@ def cart_context(request):
     except Exception:
         pass
     return {'cart_item_count': count}
+
+
+def display_currency(request):
+    """Resolve the visitor's preferred display currency.
+
+    Resolution order: `?currency=` query param → session → `STORE_CURRENCY`.
+    The visitor can pin a currency via `/?currency=EUR`. Templates render
+    prices in the store currency by default; multi-currency aware
+    templates can `{{ price|convert:DISPLAY_CURRENCY }}` (filter shipped by
+    the multi-currency feature in core/templatetags/morph.py).
+    """
+    cur = (request.GET.get('currency') or '').upper()[:3]
+    if cur:
+        request.session['display_currency'] = cur
+    cur = cur or request.session.get('display_currency') or django_settings.STORE_CURRENCY
+    return {'DISPLAY_CURRENCY': cur}

@@ -71,14 +71,62 @@ def home(request):
 
 
 def product_list(request):
-    data = internal_graphql(PRODUCT_LIST_QUERY, variables={
-        'first': 24,
-        'search': request.GET.get('q', ''),
-        'category': request.GET.get('category', ''),
-    }, request=request)
+    """Product list with merchant-friendly facets: category, tag, price range, sort."""
+    from decimal import Decimal, InvalidOperation
+    from plugins.installed.catalog.models import Category, Product
+
+    qs = Product.objects.filter(status='active').select_related('category')
+
+    # Search
+    q = (request.GET.get('q') or '').strip()
+    if q:
+        from django.db.models import Q
+        qs = qs.filter(Q(name__icontains=q) | Q(short_description__icontains=q) | Q(sku__iexact=q))
+
+    # Category filter
+    cat_slug = (request.GET.get('category') or '').strip()
+    if cat_slug:
+        qs = qs.filter(category__slug=cat_slug)
+
+    # Tag filter
+    tag_slug = (request.GET.get('tag') or '').strip()
+    if tag_slug:
+        qs = qs.filter(tags__name__iexact=tag_slug)
+
+    # Price range
+    pmin = request.GET.get('price_min')
+    pmax = request.GET.get('price_max')
+    try:
+        if pmin:
+            qs = qs.filter(price__gte=Decimal(pmin))
+        if pmax:
+            qs = qs.filter(price__lte=Decimal(pmax))
+    except (InvalidOperation, TypeError):
+        pass
+
+    # Sort
+    sort = (request.GET.get('sort') or 'newest').strip()
+    sort_map = {
+        'newest': '-created_at',
+        'oldest': 'created_at',
+        'price_asc': 'price',
+        'price_desc': '-price',
+        'name': 'name',
+    }
+    qs = qs.order_by(sort_map.get(sort, '-created_at'))
+
+    products = list(qs[:60])
+    categories = list(Category.objects.filter(parent__isnull=True).order_by('name'))
+
     return render(request, 'storefront/product_list.html', {
-        'products': (data or {}).get('products', []),
-        'search_query': request.GET.get('q', ''),
+        'products': products,
+        'categories': categories,
+        'search_query': q,
+        'selected_category': cat_slug,
+        'selected_tag': tag_slug,
+        'selected_sort': sort,
+        'price_min': pmin or '',
+        'price_max': pmax or '',
     })
 
 

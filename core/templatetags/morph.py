@@ -56,3 +56,36 @@ def storefront_blocks(context, slot: str) -> str:
                 block.plugin, block.slot, e, exc_info=True,
             )
     return mark_safe(''.join(rendered_parts))
+
+
+@register.filter(name='convert')
+def convert_money(value, target_currency: str):
+    """Convert a Money value to the target currency using the latest ExchangeRate.
+
+    No-op (returns value as-is) when:
+    - value isn't a Money object,
+    - source and target currencies match,
+    - no ExchangeRate row exists for the pair.
+    """
+    if not value or not target_currency:
+        return value
+    try:
+        from djmoney.money import Money
+        from core.models import ExchangeRate
+    except ImportError:
+        return value
+    if not isinstance(value, Money):
+        return value
+    src = str(value.currency)
+    tgt = (target_currency or '').upper()[:3]
+    if src == tgt:
+        return value
+    try:
+        rate = ExchangeRate.objects.filter(base_currency=src, quote_currency=tgt).first()
+    except Exception:  # noqa: BLE001
+        return value
+    if rate is None:
+        return value
+    from decimal import Decimal
+    converted = (Decimal(value.amount) * Decimal(rate.rate)).quantize(Decimal('0.01'))
+    return Money(converted, tgt)

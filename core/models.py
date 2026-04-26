@@ -125,3 +125,28 @@ class OutboxEvent(models.Model):
 
     def __str__(self):
         return f"{self.event_type} - {self.status}"
+
+
+class ExchangeRate(models.Model):
+    """A snapshot rate from `base` → `quote` currency (e.g. USD → EUR).
+
+    Used by storefront context processor to display prices in the
+    visitor's chosen currency. Rates are merchant-managed (or pulled by
+    a daily celery task — see plugins.installed.environments).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    base_currency = models.CharField(max_length=3, db_index=True)
+    quote_currency = models.CharField(max_length=3, db_index=True)
+    rate = models.DecimalField(max_digits=18, decimal_places=8)
+    source = models.CharField(max_length=50, default='manual')
+    fetched_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('base_currency', 'quote_currency')
+        indexes = [
+            models.Index(fields=['base_currency', 'quote_currency']),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.base_currency}→{self.quote_currency}: {self.rate}'
