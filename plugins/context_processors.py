@@ -4,31 +4,39 @@ from __future__ import annotations
 from collections import OrderedDict
 
 
-# Section display order in the admin sidebar. Sections not in this list
-# fall through to alphabetical order at the bottom.
+# Section display order in the admin sidebar — Shopify-style top-to-bottom.
+# Sections not in this list fall through to alphabetical order at the bottom.
 _SECTION_ORDER = [
-    'plugins',
-    'sales',
-    'marketplace',
-    'marketing',
-    'crm',
-    'growth',      # affiliates / loyalty
-    'ai',          # agent_core / Concierge / Ops
-    'developer',   # webhooks_ui / functions
-    'settings',
-    'apps',
+    'ai',           # AI & agents — Morpheus's defining surface; goes at the top
+    'sales',        # Orders, Draft orders
+    'catalog',      # Products, Bulk CSV, Demo data
+    'crm',          # Leads, Accounts, Deals, Tasks
+    'marketing',    # Campaigns, Promotions, Coupons
+    'cms',          # Pages, Blocks, Menus, Forms
+    'analytics',    # Sessions, Events, Funnels
+    'seo',          # SEO audit, redirects, JSON-LD config
+    'growth',       # Affiliates, loyalty
+    'marketplace',  # Vendor onboarding, splits, payouts
+    'developer',    # Webhooks UI, Functions
+    'plugins',      # uncategorised plugin pages
+    'settings',     # RBAC, settings-adjacent operational pages
+    'apps',         # the Apps catalog page
 ]
 
 _SECTION_LABELS = {
-    'plugins': 'Plugins',
-    'sales': 'Sales',
-    'marketplace': 'Marketplace',
-    'marketing': 'Marketing',
-    'crm': 'CRM',
-    'growth': 'Growth',
     'ai': 'AI & agents',
+    'sales': 'Sales',
+    'catalog': 'Catalog',
+    'crm': 'Customers & CRM',
+    'marketing': 'Marketing',
+    'cms': 'Content',
+    'analytics': 'Analytics',
+    'seo': 'SEO',
+    'growth': 'Growth',
+    'marketplace': 'Marketplace',
     'developer': 'Developer',
-    'settings': 'Settings',
+    'plugins': 'More plugins',
+    'settings': 'Access & roles',
     'apps': 'Apps',
 }
 

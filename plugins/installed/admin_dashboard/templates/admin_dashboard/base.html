@@ -227,11 +227,19 @@
       });
     });
 
-    // Settings-mode sidebar swap. Detect from URL; animate the swap.
+    // Settings-mode sidebar swap. Trigger ONLY on:
+    //   /dashboard/settings/           — the unified settings hub
+    //   /dashboard/apps/<plugin>/settings/  — a plugin's settings panel
+    // Plugin operational pages at /dashboard/apps/<plugin>/<other-slug>/
+    // keep the main menu visible (Shopify-style — daily-use pages live in
+    // the main sidebar; only persistent configuration switches into
+    // settings mode).
     const navMain = document.getElementById('nav-main');
     const navSettings = document.getElementById('nav-settings');
     const settingsBackRow = document.getElementById('settings-back-row');
-    const inSettings = location.pathname.startsWith('/dashboard/settings/') || location.pathname.startsWith('/dashboard/apps/');
+    const path = location.pathname;
+    const inSettings = path.startsWith('/dashboard/settings/')
+        || /^\/dashboard\/apps\/[^/]+\/settings\/?$/.test(path);
     function showSettingsNav() {
       if (!navMain || !navSettings) return;
       navMain.style.display = 'none';
