@@ -1,4 +1,4 @@
-{% load static %}<!DOCTYPE html>
+{% load static morph_assistant %}<!DOCTYPE html>
 <html lang="en" class="light">
 <head>
 <meta charset="UTF-8">
@@ -167,6 +167,8 @@
       <i data-lucide="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[color:var(--text-subtle)]"></i>
       <input type="text" placeholder="Search orders, products, customers…" class="input input-search">
     </div>
+    {# Inline AI affordance — context-aware "Ask the Assistant" button. #}
+    {% morph_ask %}
     <a href="{% url 'admin_dashboard:settings' %}" class="btn btn-ghost p-1.5" aria-label="Settings"><i data-lucide="settings" class="h-4 w-4"></i></a>
     <button class="btn btn-ghost p-1.5" aria-label="Notifications"><i data-lucide="bell" class="h-4 w-4"></i></button>
     {# User menu — top-right. Click to open dropdown. #}

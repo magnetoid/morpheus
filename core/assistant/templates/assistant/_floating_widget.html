@@ -84,5 +84,16 @@
     .then(data => { thinking.remove(); pushLine('assistant', data.text || data.error || '(no reply)'); })
     .catch(() => { thinking.remove(); pushLine('assistant', 'connection error'); });
   });
+
+  // Inline-affordance bridge: any "Ask the Assistant" button on a dashboard
+  // page dispatches `morph:ask` with a prefill string. We open the panel,
+  // pre-load history, and seed the input.
+  window.addEventListener('morph:ask', function(e) {
+    var prefill = (e.detail && e.detail.prefill) || '';
+    panel.style.display = 'flex';
+    loadHistory();
+    var input = form.querySelector('input[name=message]');
+    if (input) { input.value = prefill; input.focus(); }
+  });
 })();
 </script>

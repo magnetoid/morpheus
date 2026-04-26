@@ -20,6 +20,7 @@ def graphql_view(agent_only: bool = False):
 
 urlpatterns = [
     path('healthz', views.healthz, name='healthz'),
+    path('healthz/deep', views.healthz_deep, name='healthz_deep'),
     path('readyz', views.readyz, name='readyz'),
     path('graphql/', graphql_view(), name='graphql'),
     path('graphql/agent/', graphql_view(agent_only=True), name='graphql_agent'),

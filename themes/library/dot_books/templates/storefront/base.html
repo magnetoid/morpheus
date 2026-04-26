@@ -127,6 +127,12 @@
   .stack-6 > * + * { margin-top: 1.5rem; }
 </style>
 {% block extra_head %}{% endblock %}
+
+{# SEO: site-wide JSON-LD, search-engine verification metas, LLM hint. #}
+{% seo_organization_jsonld %}
+{% seo_website_jsonld %}
+{% seo_verification_metas %}
+{% seo_llms_link %}
 </head>
 <body>
 
