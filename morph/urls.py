@@ -8,6 +8,10 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
+    # The Assistant lives in core and mounts BEFORE django admin so it
+    # stays reachable even if the plugin layer fails to load. Routes
+    # under /admin/assistant/.
+    path('admin/assistant/', include('core.assistant.urls', namespace='assistant')),
     path('admin/', admin.site.urls),
     path('', include('api.urls')),          # GraphQL at /graphql/
     path('accounts/', include('allauth.urls')),

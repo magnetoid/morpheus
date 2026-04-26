@@ -1,7 +1,7 @@
 # Morpheus — Living Architecture Document
 
-> **Status:** Phase 1 shipped (sprints 1–11). **20 plugins**, dot_books theme, observability + SEO + demo seeder + Cloudflare + Functions runtime online. **98 / 98 tests passing.**
-> **Last updated:** 2026-04-25
+> **Status:** Phase 1–4 shipped. **30 plugins**, dot_books theme, hard-coded Assistant in core, kernel agent layer, full commerce stack (tax + shipping + refunds + B2B + subscriptions + gift cards + multi-currency + facets + webhooks UI + back-in-stock + scheduled prices + cart-recovery email). v0.1.0 tagged. Live at [`dotbooks.store`](https://dotbooks.store/).
+> **Last updated:** 2026-04-26
 > **Procedural companion:** [`SKILLS.md`](SKILLS.md) — every change here must have a matching skill.
 > **Plugin guide:** [`docs/PLUGIN_DEVELOPMENT.md`](docs/PLUGIN_DEVELOPMENT.md) · **Theme guide:** [`docs/THEME_DEVELOPMENT.md`](docs/THEME_DEVELOPMENT.md)
 > **Deploy:** [`docs/deploy-coolify.md`](docs/deploy-coolify.md) · [`docs/deploy-plesk-nginx.md`](docs/deploy-plesk-nginx.md)
@@ -22,31 +22,49 @@ Built for three kinds of users:
 
 ## The Fundamental Principle
 
-> **The core contains nothing but the engine.**
-> Every model, every view, every API type, every admin panel — is a plugin.
-> Even "built-in" features like the product catalog, orders, and customers are plugins.
-> They just happen to ship **enabled by default**.
+> **The core contains the engine and the Assistant.**
+> Almost every model, view, API type, and admin panel is a plugin —
+> *except* the Morpheus Assistant, which is hard-coded in core so the
+> merchant always has a window to ask "what just broke?" even when a
+> plugin import explodes. Everything else (catalog, orders, even the
+> agent kernel's specialised agents) is a plugin that ships enabled by
+> default.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                            MORPH CORE                                   │
-│   Plugin Registry · Hook Registry · GraphQL Assembler · Theme Engine    │
-│   Base Classes · Settings · Middleware · Celery                         │
-└─────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                              MORPH CORE                                  │
+│  Plugin Registry · Hook Registry · GraphQL Assembler · Theme Engine      │
+│  Base Classes · Settings · Middleware · Celery · Outbox                  │
+│  ┌──────────────────────────────────────────────────────────────────┐    │
+│  │  core/assistant/  ← HARD-CODED MORPHEUS ASSISTANT (one)           │    │
+│  │  - system tools (filesystem, DB, logs, plugins, system, delegate) │    │
+│  │  - JSONL fallback persistence — usable when DB is down            │    │
+│  │  - mounted at /admin/assistant/, never depends on plugin imports  │    │
+│  └──────────────────────────────────────────────────────────────────┘    │
+│  ┌──────────────────────────────────────────────────────────────────┐    │
+│  │  core/agents/  ← AGENT KERNEL (programming surface for plugins)   │    │
+│  │  - MorpheusAgent + Tool + AgentRuntime + LLMProvider              │    │
+│  └──────────────────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────────────┘
                               │ loads & wires
          ┌────────────────────┼────────────────────┐
          ▼                    ▼                    ▼
-  DEFAULT PLUGINS       DEFAULT PLUGINS       OPTIONAL PLUGINS
-  (enabled by default)  (enabled by default)  (disabled by default)
-  ┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-  │   catalog    │      │  storefront  │      │   reviews    │
-  │   orders     │      │ ai_assistant │      │   wishlist   │
-  │  customers   │      │  analytics   │      │loyalty_points│
-  │   payments   │      │             │      │  gift_cards  │
-  │  inventory   │      │             │      │  subscript.  │
-  │  marketing   │      │             │      │    pos       │
-  └──────────────┘      └──────────────┘      └──────────────┘
+  COMMERCE PLUGINS      AGENT PLUGINS         INFRA PLUGINS
+  catalog · orders      agent_core            cloudflare
+  customers · payments  ai_assistant          observability
+  inventory · marketing ai_content            environments
+  analytics · storefront functions            importers
+  tax · shipping        crm (Account Mgr)     seo
+  wishlist · gift_cards advanced_ecommerce    webhooks_ui
+  affiliates · b2b      admin_dashboard       demo_data
+  marketplace
+  subscriptions
 ```
+
+**Specialised agents** (shipped by `agent_core` and `crm`):
+Concierge (storefront), Merchant Ops (admin), Pricing (system), Content
+Writer (merchant), Account Manager (CRM merchant). The Assistant invokes
+them via `delegate.invoke_agent`.
 
 ---
 

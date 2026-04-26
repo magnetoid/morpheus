@@ -380,11 +380,21 @@ def _toggle_plugin(request: HttpRequest):
 
 @staff_member_required
 def settings_view(request: HttpRequest) -> HttpResponse:
+    """Unified Settings hub.
+
+    Top-level sections (Store / AI / Theme / Channels / Webhooks) come from
+    core. Every plugin that contributes a `SettingsPanel` gets its own
+    page in the list — e.g. a Payoneer payment plugin shows up as its own
+    entry. Click an entry → its form opens (handled at
+    `/dashboard/apps/<plugin>/settings/`).
+    """
     from django.conf import settings as dj_settings
-    sections = [
+    from plugins.registry import plugin_registry
+
+    core_sections = [
         {
-            'title': 'Store',
-            'icon': 'store',
+            'key': 'store', 'label': 'Store', 'icon': 'store',
+            'description': 'Name, country, default currency.',
             'items': [
                 ('Store name', getattr(dj_settings, 'STORE_NAME', '—')),
                 ('Currency', getattr(dj_settings, 'STORE_CURRENCY', '—')),
@@ -393,8 +403,8 @@ def settings_view(request: HttpRequest) -> HttpResponse:
             ],
         },
         {
-            'title': 'AI',
-            'icon': 'sparkles',
+            'key': 'ai', 'label': 'AI defaults', 'icon': 'sparkles',
+            'description': 'LLM provider + model used by the kernel Assistant and built-in agents.',
             'items': [
                 ('Provider', getattr(dj_settings, 'AI_PROVIDER', '—')),
                 ('Model', getattr(dj_settings, 'AI_MODEL', '—')),
@@ -402,23 +412,32 @@ def settings_view(request: HttpRequest) -> HttpResponse:
             ],
         },
         {
-            'title': 'Payments',
-            'icon': 'credit-card',
-            'items': [
-                ('Stripe configured', 'Yes' if getattr(dj_settings, 'STRIPE_SECRET_KEY', '') else 'No'),
-                ('Webhook signing', 'Yes' if getattr(dj_settings, 'STRIPE_WEBHOOK_SECRET', '') else 'No'),
-            ],
-        },
-        {
-            'title': 'Theme',
-            'icon': 'palette',
+            'key': 'theme', 'label': 'Theme', 'icon': 'palette',
+            'description': 'Active storefront theme.',
             'items': [
                 ('Active theme', getattr(dj_settings, 'MORPHEUS_ACTIVE_THEME', '—')),
             ],
         },
     ]
+
+    # Aggregate every plugin's SettingsPanel so each appears as its own
+    # entry in the unified menu (e.g. "Payoneer", "Stripe", "Cloudflare").
+    plugin_panels = []
+    for plugin in plugin_registry.active_plugins():
+        panel = plugin_registry.settings_panel(plugin.name)
+        if panel is not None:
+            plugin_panels.append({
+                'plugin': plugin.name,
+                'label': panel.label or plugin.label,
+                'description': panel.description or plugin.description,
+                'icon': 'settings',
+                'url': f'/dashboard/apps/{plugin.name}/settings/',
+            })
+    plugin_panels.sort(key=lambda p: p['label'].lower())
+
     return render(request, 'admin_dashboard/settings.html', {
-        'sections': sections,
+        'core_sections': core_sections,
+        'plugin_panels': plugin_panels,
         'active_nav': 'settings',
     })
 

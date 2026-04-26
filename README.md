@@ -14,19 +14,39 @@ a third-party API consumer. Morpheus treats AI agents as the **primary
 audience**: every feature, schema, and state transition is designed to be
 machine-actionable first, human-pretty second.
 
-Three things make it different from anything else open-source today:
+What makes it different from anything else open-source today:
 
-1. **Agent-readable surface.** A `/graphql/agent/` endpoint, signed agent
-   receipts, structured `agent_metadata` on every product, and a Python SDK
-   so any LLM can browse, propose, and check out without scraping.
-2. **Composability.** Everything beyond the bare engine is a plugin under
-   `plugins/installed/`. 20 ship by default; the merchant can add more or
-   disable any of them.
-3. **Event-sourced + outbox-driven.** Every state change emits a hook +
+1. **Hard-coded Assistant in core.** [`core/assistant/`](core/assistant/) is a
+   single Morpheus Assistant — not a plugin — that survives plugin failure,
+   has system-level scopes (filesystem, DB introspection, log search,
+   plugin status, server info), and delegates to specialised agents. It
+   stays reachable at `/admin/assistant/` even when the plugin layer is
+   degraded. JSONL fallback persistence keeps the chat usable when the DB
+   is down.
+2. **Kernel agent layer.** [`core/agents/`](core/agents/) is a peer of
+   `core/hooks` and `plugins/`. Defines `MorpheusAgent`, `Tool`,
+   `AgentRuntime` (real LLM tool-use loop), provider abstraction
+   (OpenAI/Anthropic/Ollama/Mock), versioned prompts, capability scopes,
+   lossless trace. Plugins contribute their own agents and tools; the
+   Assistant invokes them via `delegate.invoke_agent`.
+3. **Agent-readable commerce surface.** A `/graphql/agent/` endpoint,
+   signed agent receipts, structured `agent_metadata` on every product,
+   and a Python SDK so any LLM can browse, propose, and check out without
+   scraping.
+4. **Composability.** Everything beyond the bare engine is a plugin under
+   `plugins/installed/`. 30 ship by default; the merchant can add more or
+   disable any of them. Plugins can contribute storefront blocks,
+   dashboard pages, settings panels, agents, and agent tools — enabling a
+   plugin lights up multiple surfaces at once.
+5. **Event-sourced + outbox-driven.** Every state change emits a hook +
    writes to a transactional outbox shipped to NATS JetStream. Replayable,
    auditable, fanout-friendly.
 
-**Status:** 11 PRs landed, 20 plugins active, 98 / 98 tests green.
+**Built-in agents** (delegated to by the Assistant):
+Concierge (storefront), Merchant Ops (admin), Pricing (system), Content
+Writer (merchant), Account Manager (from `crm`).
+
+**Status:** 30+ PRs landed · 30 plugins active · v0.1.0 tagged · live at [`dotbooks.store`](https://dotbooks.store/).
 
 ---
 
@@ -92,12 +112,14 @@ celery -A morph beat -l info               # for observability rollups
 | Module | Role |
 |---|---|
 | [`core/`](core/) | hooks, models, tasks (HMAC-signed webhooks, NATS outbox), Celery, observability bootstrap, request_id, JSON logging, Sentry |
+| [`core/assistant/`](core/assistant/) | **Hard-coded Morpheus Assistant** — runtime, providers, system tools (filesystem/DB/logs/plugins), JSONL-fallback persistence. Stays reachable when plugins fail. |
+| [`core/agents/`](core/agents/) | Agent kernel — `MorpheusAgent`, `Tool`, `AgentRuntime`, provider abstraction, prompts registry, scopes, trace. |
 | [`api/`](api/) | GraphQL view (depth/alias guarded, masked errors), REST viewsets, agent-only endpoint, exception handler, rate limiter |
 | [`plugins/`](plugins/) | plugin base class + registry with topological-sort activation; `morph_create_plugin` scaffolder |
 | [`themes/`](themes/) | theme base + registry + ThemeLoader; `morph_create_theme` scaffolder |
 | [`morph/`](morph/) | Django settings, ASGI/WSGI, Celery |
 
-### First-party plugins (20)
+### First-party plugins (30)
 
 | Plugin | What it does |
 |---|---|
@@ -121,6 +143,16 @@ celery -A morph beat -l info               # for observability rollups
 | [`cloudflare`](plugins/installed/cloudflare/) | DNS, cache purge, WAF, R2 — auto-purge on `product.updated` |
 | [`seo`](plugins/installed/seo/) | Per-object meta + JSON-LD, sitemap.xml, robots.txt, redirects, autofill |
 | [`demo_data`](plugins/installed/demo_data/) | `manage.py morph_seed_demo` — bookstore fixtures |
+| [`advanced_ecommerce`](plugins/installed/advanced_ecommerce/) | Recently viewed, free-shipping progress, low-stock badge — reference plugin for contribution surfaces |
+| [`agent_core`](plugins/installed/agent_core/) | Persistence + GraphQL + admin runs dashboard for the agent kernel; ships Concierge/Merchant Ops/Pricing/Content Writer agents |
+| [`crm`](plugins/installed/crm/) | Leads, accounts, deals, interactions timeline, follow-up tasks; ships the Account Manager agent |
+| [`tax`](plugins/installed/tax/) | Regions, categorised rates (US sales tax / EU VAT / OSS); cart-total hook |
+| [`shipping`](plugins/installed/shipping/) | Zones + rates (flat / weight / order-total tier / free-over / Shippo / EasyPost slots) |
+| [`wishlist`](plugins/installed/wishlist/) | Customer + guest wishlists with shareable links |
+| [`webhooks_ui`](plugins/installed/webhooks_ui/) | Endpoint CRUD + delivery log with retry/replay; HMAC-SHA256 signed |
+| [`gift_cards`](plugins/installed/gift_cards/) | Issue / redeem / balance, append-only ledger |
+| [`b2b`](plugins/installed/b2b/) | Quotes + per-account price lists + Net 15/30/45/60/90 |
+| [`subscriptions`](plugins/installed/subscriptions/) | Plan + Subscription + invoice; Stripe Billing adapter slot |
 
 ### First-party theme
 
