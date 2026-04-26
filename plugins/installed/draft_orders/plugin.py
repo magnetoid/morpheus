@@ -36,11 +36,11 @@ class DraftOrdersPlugin(MorpheusPlugin):
     def contribute_dashboard_pages(self) -> list:
         return [
             DashboardPage(
-                slug='draft-orders',
+                slug='index',
                 label='Draft orders',
-                section='Sales',
+                section='sales',
                 icon='file-text',
-                url='/dashboard/draft-orders/',
-                description='Build quotes, share with the customer, convert to a real order.',
+                view='plugins.installed.draft_orders.views.index',
+                order=20,
             ),
         ]
