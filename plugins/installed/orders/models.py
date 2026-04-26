@@ -20,6 +20,7 @@ class Cart(models.Model):
         'marketing.Coupon', on_delete=models.SET_NULL, null=True, blank=True
     )
     notes = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

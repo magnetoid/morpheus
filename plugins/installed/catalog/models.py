@@ -334,3 +334,33 @@ class Review(models.Model):
 
     def __str__(self):
         return f"{self.rating}★ review by {self.customer.email} on {self.product.name}"
+
+
+class PriceSchedule(models.Model):
+    """A planned price change for a product/variant.
+
+    A celery beat task scans for entries with `applied_at__isnull=True` and
+    `effective_at <= now`, then writes the new price + marks them applied.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='price_schedules')
+    variant = models.ForeignKey(
+        ProductVariant, on_delete=models.CASCADE,
+        null=True, blank=True, related_name='price_schedules',
+    )
+    new_price = MoneyField(max_digits=14, decimal_places=2, default_currency='USD')
+    new_compare_at = MoneyField(
+        max_digits=14, decimal_places=2, default_currency='USD',
+        null=True, blank=True,
+    )
+    effective_at = models.DateTimeField(db_index=True)
+    applied_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    note = models.CharField(max_length=240, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['effective_at']
+        indexes = [
+            models.Index(fields=['effective_at', 'applied_at']),
+        ]

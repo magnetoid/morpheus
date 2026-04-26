@@ -3,6 +3,7 @@ Morpheus CMS - Inventory Models
 Stock tracking, warehouses, stock movements
 """
 import uuid
+from django.conf import settings
 from django.db import models
 from django.db import transaction
 
@@ -105,3 +106,32 @@ class StockMovement(models.Model):
                 notes=notes,
                 created_by=user,
             )
+
+
+class BackInStockSubscription(models.Model):
+    """Email me when this product is back in stock."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product = models.ForeignKey(
+        'catalog.Product', on_delete=models.CASCADE, related_name='back_in_stock_subs',
+    )
+    variant = models.ForeignKey(
+        'catalog.ProductVariant', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='back_in_stock_subs',
+    )
+    email = models.EmailField(db_index=True)
+    customer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='back_in_stock_subs',
+    )
+    notified_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ('product', 'variant', 'email')
+        indexes = [
+            models.Index(fields=['product', 'notified_at']),
+            models.Index(fields=['variant', 'notified_at']),
+        ]
