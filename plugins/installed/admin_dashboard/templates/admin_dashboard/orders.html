@@ -10,6 +10,12 @@
       <p class="text-sm text-[color:var(--text-muted)]">Showing the most recent 100.</p>
     </div>
     <div class="flex items-center gap-2">
+      {% if drafts_url %}
+      <a href="{{ drafts_url }}" class="btn">
+        <i data-lucide="file-text" class="h-4 w-4"></i> Drafts
+        {% if draft_count %}<span class="pill pill-info" style="margin-left:.35rem;">{{ draft_count }}</span>{% endif %}
+      </a>
+      {% endif %}
       <button class="btn"><i data-lucide="download" class="h-4 w-4"></i> Export</button>
       <button class="btn btn-primary"><i data-lucide="plus" class="h-4 w-4"></i> Create order</button>
     </div>

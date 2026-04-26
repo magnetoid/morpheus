@@ -44,6 +44,7 @@ class RbacPlugin(MorpheusPlugin):
             DashboardPage(
                 label='Roles & users', slug='roles',
                 view='plugins.installed.rbac.dashboard.roles_page',
-                icon='shield-check', section='settings', order=10,
+                icon='shield-check', section='access', order=10,
+                nav='settings',
             ),
         ]

@@ -95,6 +95,7 @@ class AgentCorePlugin(MorpheusPlugin):
                 icon='sparkles',
                 section='ai',
                 order=10,
+                nav='settings',
             ),
             DashboardPage(
                 label='Ops console',
@@ -103,6 +104,7 @@ class AgentCorePlugin(MorpheusPlugin):
                 icon='terminal',
                 section='ai',
                 order=20,
+                nav='settings',
             ),
             DashboardPage(
                 label='Background agents',
@@ -111,6 +113,7 @@ class AgentCorePlugin(MorpheusPlugin):
                 icon='clock',
                 section='ai',
                 order=30,
+                nav='settings',
             ),
             DashboardPage(
                 label='Observability',
@@ -119,6 +122,7 @@ class AgentCorePlugin(MorpheusPlugin):
                 icon='activity',
                 section='ai',
                 order=40,
+                nav='settings',
             ),
         ]
 

@@ -28,9 +28,10 @@ class DemoDataPlugin(MorpheusPlugin):
             DashboardPage(
                 slug='index',
                 label='Demo data',
-                section='catalog',
+                section='data',
                 icon='database',
                 view='plugins.installed.demo_data.views.demo_data_index',
-                order=90,
+                order=20,
+                nav='settings',
             ),
         ]

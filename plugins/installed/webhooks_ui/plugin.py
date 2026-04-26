@@ -30,10 +30,12 @@ class WebhooksUiPlugin(MorpheusPlugin):
                 label='Webhooks', slug='endpoints',
                 view='plugins.installed.webhooks_ui.views.endpoints_list',
                 icon='webhook', section='developer', order=10,
+                nav='settings',
             ),
             DashboardPage(
                 label='Deliveries', slug='deliveries',
                 view='plugins.installed.webhooks_ui.views.deliveries_list',
                 icon='list', section='developer', order=20,
+                nav='settings',
             ),
         ]

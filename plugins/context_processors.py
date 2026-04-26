@@ -7,9 +7,10 @@ from collections import OrderedDict
 # Section display order in the admin sidebar — Shopify-style top-to-bottom.
 # Sections not in this list fall through to alphabetical order at the bottom.
 _SECTION_ORDER = [
+    # Main sidebar (daily-use)
     'ai',           # AI & agents — Morpheus's defining surface; goes at the top
-    'sales',        # Orders, Draft orders
-    'catalog',      # Products, Bulk CSV, Demo data
+    'sales',        # Orders (drafts surface inline)
+    'catalog',      # Products, Categories, Collections
     'crm',          # Leads, Accounts, Deals, Tasks
     'marketing',    # Campaigns, Promotions, Coupons
     'cms',          # Pages, Blocks, Menus, Forms
@@ -17,9 +18,13 @@ _SECTION_ORDER = [
     'seo',          # SEO audit, redirects, JSON-LD config
     'growth',       # Affiliates, loyalty
     'marketplace',  # Vendor onboarding, splits, payouts
-    'developer',    # Webhooks UI, Functions
-    'plugins',      # uncategorised plugin pages
-    'settings',     # RBAC, settings-adjacent operational pages
+    'plugins',      # uncategorised main-nav plugin pages
+
+    # Settings sidebar (admin / setup)
+    'developer',    # Webhooks endpoints + deliveries
+    'access',       # Roles & users (RBAC)
+    'data',         # Bulk CSV import/export, Demo data
+    'settings',     # legacy 'settings' bucket — anything left over
     'apps',         # the Apps catalog page
 ]
 
@@ -34,19 +39,17 @@ _SECTION_LABELS = {
     'seo': 'SEO',
     'growth': 'Growth',
     'marketplace': 'Marketplace',
-    'developer': 'Developer',
     'plugins': 'More plugins',
-    'settings': 'Access & roles',
+    'developer': 'Developer tools',
+    'access': 'Access & roles',
+    'data': 'Data tools',
+    'settings': 'Settings',
     'apps': 'Apps',
 }
 
 
-def plugin_context(request):
-    from plugins.registry import plugin_registry
-
-    pages = plugin_registry.dashboard_pages()
-
-    # Group by section.
+def _group_by_section(pages):
+    """Group + order pages by section the same way for any sidebar."""
     by_section: dict[str, list] = {}
     for page in pages:
         by_section.setdefault(page.section or 'plugins', []).append(page)
@@ -58,7 +61,7 @@ def plugin_context(request):
     for key in sorted(by_section.keys()):
         grouped[key] = by_section[key]
 
-    sidebar_sections = [
+    return [
         {
             'key': key,
             'label': _SECTION_LABELS.get(key, key.replace('_', ' ').title()),
@@ -67,11 +70,22 @@ def plugin_context(request):
         for key, pages_in_section in grouped.items()
     ]
 
+
+def plugin_context(request):
+    from plugins.registry import plugin_registry
+
+    pages = plugin_registry.dashboard_pages()
+
+    # Split by sidebar destination.
+    main_pages = [p for p in pages if getattr(p, 'nav', 'main') != 'settings']
+    settings_pages = [p for p in pages if getattr(p, 'nav', 'main') == 'settings']
+
     return {
         'active_plugins': plugin_registry._active,
         'plugin_registry': plugin_registry,
-        'dashboard_pages': pages,             # back-compat flat list
-        'sidebar_sections': sidebar_sections,  # grouped + ordered
-        # Template-safe accessor for the unified Settings sidebar.
+        'dashboard_pages': pages,                          # back-compat flat list
+        'sidebar_sections': _group_by_section(main_pages),  # main sidebar
+        'settings_sections': _group_by_section(settings_pages),  # settings sidebar
+        # Schema-driven settings panels (form-based).
         'plugin_settings_panels': plugin_registry.all_settings_panels(),
     }

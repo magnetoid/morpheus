@@ -26,10 +26,11 @@ class ImportersPlugin(MorpheusPlugin):
         return [
             DashboardPage(
                 slug='csv',
-                label='Bulk CSV',
-                section='catalog',
+                label='Bulk CSV import / export',
+                section='data',
                 icon='upload',
                 view='plugins.installed.importers.views.csv_index',
-                order=80,
+                order=10,
+                nav='settings',
             ),
         ]
