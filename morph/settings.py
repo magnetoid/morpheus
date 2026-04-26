@@ -163,6 +163,7 @@ TEMPLATES = [
                 'core.context_processors.store_settings',
                 'core.context_processors.cart_context',
                 'core.context_processors.display_currency',
+                'core.context_processors.channel_context',
                 'themes.context_processors.theme_context',
                 'plugins.context_processors.plugin_context',
             ],

@@ -36,14 +36,39 @@ def cart_context(request):
 def display_currency(request):
     """Resolve the visitor's preferred display currency.
 
-    Resolution order: `?currency=` query param → session → `STORE_CURRENCY`.
-    The visitor can pin a currency via `/?currency=EUR`. Templates render
-    prices in the store currency by default; multi-currency aware
-    templates can `{{ price|convert:DISPLAY_CURRENCY }}` (filter shipped by
-    the multi-currency feature in core/templatetags/morph.py).
+    Resolution order: `?currency=` query param → session → channel currency
+    → `STORE_CURRENCY`. The visitor can pin a currency via `/?currency=EUR`.
+    Templates render prices in the channel/store currency by default;
+    multi-currency-aware templates use `{{ price|convert:DISPLAY_CURRENCY }}`.
     """
     cur = (request.GET.get('currency') or '').upper()[:3]
     if cur:
         request.session['display_currency'] = cur
-    cur = cur or request.session.get('display_currency') or django_settings.STORE_CURRENCY
+    if not cur:
+        cur = request.session.get('display_currency')
+    if not cur:
+        try:
+            from core.channels import current_channel
+            ch = current_channel(request)
+            cur = getattr(ch, 'currency', '') or django_settings.STORE_CURRENCY
+        except Exception:
+            cur = django_settings.STORE_CURRENCY
     return {'DISPLAY_CURRENCY': cur}
+
+
+def channel_context(request):
+    """Expose the resolved StoreChannel + its currency/country to every template."""
+    try:
+        from core.channels import current_channel
+        channel = current_channel(request)
+        return {
+            'CURRENT_CHANNEL': channel,
+            'CHANNEL_CURRENCY': getattr(channel, 'currency', None) or django_settings.STORE_CURRENCY,
+            'CHANNEL_COUNTRY': getattr(channel, 'default_country', None) or django_settings.STORE_COUNTRY,
+        }
+    except Exception:
+        return {
+            'CURRENT_CHANNEL': None,
+            'CHANNEL_CURRENCY': django_settings.STORE_CURRENCY,
+            'CHANNEL_COUNTRY': django_settings.STORE_COUNTRY,
+        }
