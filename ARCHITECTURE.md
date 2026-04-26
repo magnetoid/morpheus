@@ -1,6 +1,6 @@
 # Morpheus — Living Architecture Document
 
-> **Status:** Phase 1–4 shipped. **30 plugins**, dot_books theme, hard-coded Assistant in core, kernel agent layer, full commerce stack (tax + shipping + refunds + B2B + subscriptions + gift cards + multi-currency + facets + webhooks UI + back-in-stock + scheduled prices + cart-recovery email). v0.1.0 tagged. Live at [`dotbooks.store`](https://dotbooks.store/).
+> **Status:** Phase 1–5 shipped. **33 plugins**, dot_books theme, hard-coded Assistant in core, kernel agent layer with Skills + background scheduling + observability dashboard, full Saleor-parity commerce (PaymentGateway abstraction · Promotion engine v2 · Draft orders · Multi-warehouse allocator · RBAC · channels · i18n · audit log) plus the agent-first surface (`/llms.txt`, agent receipts, agent GraphQL). v0.1.0 + Phase 5 live at [`dotbooks.store`](https://dotbooks.store/).
 > **Last updated:** 2026-04-26
 > **Procedural companion:** [`SKILLS.md`](SKILLS.md) — every change here must have a matching skill.
 > **Plugin guide:** [`docs/PLUGIN_DEVELOPMENT.md`](docs/PLUGIN_DEVELOPMENT.md) · **Theme guide:** [`docs/THEME_DEVELOPMENT.md`](docs/THEME_DEVELOPMENT.md)
@@ -43,7 +43,12 @@ Built for three kinds of users:
 │  └──────────────────────────────────────────────────────────────────┘    │
 │  ┌──────────────────────────────────────────────────────────────────┐    │
 │  │  core/agents/  ← AGENT KERNEL (programming surface for plugins)   │    │
-│  │  - MorpheusAgent + Tool + AgentRuntime + LLMProvider              │    │
+│  │  - MorpheusAgent + Tool + Skill + AgentRuntime + LLMProvider      │    │
+│  │  - skill_registry: reusable tool bundles agents opt into          │    │
+│  └──────────────────────────────────────────────────────────────────┘    │
+│  ┌──────────────────────────────────────────────────────────────────┐    │
+│  │  core/audit/    core/i18n/   core/embeddings.py                   │    │
+│  │  core/utils/{safe_db, rate_limit}     core/management/morph_backup │    │
 │  └──────────────────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────────────────┘
                               │ loads & wires
@@ -53,18 +58,21 @@ Built for three kinds of users:
   catalog · orders      agent_core            cloudflare
   customers · payments  ai_assistant          observability
   inventory · marketing ai_content            environments
-  analytics · storefront functions            importers
+  analytics · storefront functions            importers (+ CSV)
   tax · shipping        crm (Account Mgr)     seo
   wishlist · gift_cards advanced_ecommerce    webhooks_ui
   affiliates · b2b      admin_dashboard       demo_data
-  marketplace
+  marketplace · cms                           rbac
   subscriptions
+  promotions · draft_orders
 ```
 
 **Specialised agents** (shipped by `agent_core` and `crm`):
 Concierge (storefront), Merchant Ops (admin), Pricing (system), Content
 Writer (merchant), Account Manager (CRM merchant). The Assistant invokes
-them via `delegate.invoke_agent`.
+them via `delegate.invoke_agent`. **Background agents** can schedule any
+of them on a fixed interval; `BackgroundAgent` rows are fired by Celery
+beat and traced to the same `AgentRun` table as interactive runs.
 
 ---
 
