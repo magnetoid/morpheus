@@ -1,6 +1,10 @@
 {% extends "storefront/base.html" %}
-{% load morph %}
+{% load morph %}{% load seo %}
 {% block title %}{{ product.name }} — dot books{% endblock %}
+
+{% block extra_head %}
+{% seo_product_jsonld product %}
+{% endblock %}
 
 {% block content %}
 <section style="padding: 2.5rem 0 5rem;">
