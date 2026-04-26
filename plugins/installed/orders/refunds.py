@@ -1,0 +1,245 @@
+"""Refund + RMA (Return Merchandise Authorization) services and models.
+
+Models live in `models.py` historically; the new `ReturnRequest` is added
+here via a separate migration to keep this PR's scope tight.
+
+Flow:
+1. Customer or agent submits a `ReturnRequest` for line items they want
+   to return. State: `requested`.
+2. Merchant (or AccountManager agent) approves → `approved` + RMA number.
+3. Items physically arrive → `received`.
+4. Refund is created via `RefundService.process_for_return(...)` →
+   Stripe refund call → state moves to `refunded`. Fires
+   `refund.processed` + `return.refunded` events.
+"""
+from __future__ import annotations
+
+import logging
+import uuid
+from decimal import Decimal
+from typing import Iterable
+
+from django.conf import settings
+from django.db import models, transaction
+from django.utils import timezone
+from djmoney.models.fields import MoneyField
+from djmoney.money import Money
+
+from core.hooks import hook_registry
+
+logger = logging.getLogger('morpheus.orders.refunds')
+
+
+class ReturnRequest(models.Model):
+    """Customer- or staff-initiated return."""
+
+    STATE_CHOICES = [
+        ('requested', 'Requested'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('received', 'Received'),
+        ('refunded', 'Refunded'),
+        ('cancelled', 'Cancelled'),
+    ]
+    REASON_CHOICES = [
+        ('defective', 'Defective'),
+        ('wrong_item', 'Wrong item'),
+        ('not_as_described', 'Not as described'),
+        ('changed_mind', 'Changed mind'),
+        ('damaged_in_transit', 'Damaged in transit'),
+        ('other', 'Other'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order = models.ForeignKey(
+        'orders.Order', on_delete=models.CASCADE, related_name='return_requests',
+    )
+    rma_number = models.CharField(max_length=32, unique=True, blank=True)
+    state = models.CharField(max_length=12, choices=STATE_CHOICES, default='requested', db_index=True)
+    reason = models.CharField(max_length=25, choices=REASON_CHOICES, default='other')
+    customer_note = models.TextField(blank=True)
+    staff_note = models.TextField(blank=True)
+    items = models.JSONField(
+        default=list,
+        help_text='List of {order_item_id, quantity} for items being returned.',
+    )
+    refund_amount = MoneyField(
+        max_digits=14, decimal_places=2, default_currency='USD',
+        null=True, blank=True,
+        help_text='Computed at approval time; used by RefundService.',
+    )
+    refund = models.ForeignKey(
+        'orders.Refund', on_delete=models.SET_NULL, null=True, blank=True, related_name='returns',
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='requested_returns',
+    )
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='decided_returns',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['order', 'state']),
+        ]
+
+    def __str__(self) -> str:
+        return f'RMA {self.rma_number or self.id} ({self.state})'
+
+    def save(self, *args, **kwargs):
+        if not self.rma_number:
+            # RMA-YYMMDDxxxx — short and human-readable
+            self.rma_number = f'RMA-{timezone.now().strftime("%y%m%d")}{str(self.id)[:6].upper()}'
+        super().save(*args, **kwargs)
+
+
+class RefundService:
+    """Process refunds against the underlying payment provider."""
+
+    @classmethod
+    @transaction.atomic
+    def process(
+        cls, *, order, amount: Money, reason: str = 'customer_request',
+        notes: str = '', actor=None,
+    ) -> 'Refund':  # noqa: F821
+        """Create a Refund row and call the provider. Idempotent on (order, amount, reason)."""
+        from plugins.installed.orders.models import Refund
+
+        existing = Refund.objects.filter(
+            order=order, amount=amount, reason=reason, is_processed=True,
+        ).first()
+        if existing:
+            return existing
+
+        refund = Refund.objects.create(
+            order=order, amount=amount, reason=reason, notes=notes,
+        )
+        provider_ok = cls._provider_refund(order=order, amount=amount, refund=refund)
+        if provider_ok:
+            refund.is_processed = True
+            refund.processed_at = timezone.now()
+            refund.save(update_fields=['is_processed', 'processed_at'])
+            hook_registry.fire(
+                'refund.processed',
+                refund=refund, order=order, amount=amount, actor=actor,
+            )
+        else:
+            logger.warning('orders: refund %s recorded but provider call failed', refund.id)
+        return refund
+
+    @staticmethod
+    def _provider_refund(*, order, amount: Money, refund) -> bool:
+        """Best-effort: call Stripe if a charge exists; otherwise success-with-log.
+
+        We don't import stripe at module scope so the orders plugin remains
+        usable without Stripe configured.
+        """
+        try:
+            payment = order.payments.filter(
+                status__in=('succeeded', 'completed', 'paid'),
+            ).order_by('-created_at').first() if hasattr(order, 'payments') else None
+            charge_id = (payment.metadata or {}).get('stripe_charge_id') if payment else None
+            if not charge_id:
+                logger.info('orders: no stripe charge on order %s; skipping provider call', order.id)
+                return True
+
+            import stripe  # type: ignore
+            from django.conf import settings as dj_settings
+            stripe.api_key = getattr(dj_settings, 'STRIPE_SECRET_KEY', '') or ''
+            if not stripe.api_key:
+                logger.warning('orders: STRIPE_SECRET_KEY missing; skipping refund call')
+                return False
+            stripe.Refund.create(
+                charge=charge_id,
+                amount=int(Decimal(amount.amount) * 100),
+                idempotency_key=f'refund-{refund.id}',
+                metadata={'order_id': str(order.id), 'refund_id': str(refund.id)},
+            )
+            return True
+        except Exception as e:  # noqa: BLE001
+            logger.warning('orders: provider refund failed: %s', e, exc_info=True)
+            return False
+
+
+class ReturnService:
+    """Lifecycle of a `ReturnRequest`."""
+
+    @classmethod
+    def create_request(
+        cls, *, order, items: list[dict], reason: str = 'other',
+        customer_note: str = '', requested_by=None,
+    ) -> ReturnRequest:
+        rr = ReturnRequest.objects.create(
+            order=order, reason=reason, items=items,
+            customer_note=customer_note, requested_by=requested_by,
+        )
+        hook_registry.fire('return.requested', return_request=rr, order=order)
+        return rr
+
+    @classmethod
+    def approve(cls, rr: ReturnRequest, *, decided_by=None, refund_amount: Money | None = None) -> ReturnRequest:
+        if rr.state != 'requested':
+            raise ValueError(f'Cannot approve from state {rr.state}')
+        if refund_amount is None:
+            refund_amount = cls._compute_refund(rr)
+        rr.state = 'approved'
+        rr.decided_by = decided_by
+        rr.refund_amount = refund_amount
+        rr.save(update_fields=['state', 'decided_by', 'refund_amount', 'updated_at'])
+        hook_registry.fire('return.approved', return_request=rr)
+        return rr
+
+    @classmethod
+    def reject(cls, rr: ReturnRequest, *, decided_by=None, staff_note: str = '') -> ReturnRequest:
+        if rr.state != 'requested':
+            raise ValueError(f'Cannot reject from state {rr.state}')
+        rr.state = 'rejected'
+        rr.decided_by = decided_by
+        rr.staff_note = staff_note
+        rr.save(update_fields=['state', 'decided_by', 'staff_note', 'updated_at'])
+        hook_registry.fire('return.rejected', return_request=rr)
+        return rr
+
+    @classmethod
+    @transaction.atomic
+    def mark_received_and_refund(cls, rr: ReturnRequest, *, actor=None) -> ReturnRequest:
+        if rr.state not in ('approved', 'received'):
+            raise ValueError(f'Cannot refund from state {rr.state}')
+        if rr.state == 'approved':
+            rr.state = 'received'
+            rr.save(update_fields=['state', 'updated_at'])
+        amount = rr.refund_amount
+        if amount is None or amount.amount <= 0:
+            amount = cls._compute_refund(rr)
+        refund = RefundService.process(
+            order=rr.order, amount=amount, reason='customer_request',
+            notes=f'RMA {rr.rma_number}', actor=actor,
+        )
+        rr.refund = refund
+        rr.state = 'refunded'
+        rr.save(update_fields=['refund', 'state', 'updated_at'])
+        hook_registry.fire('return.refunded', return_request=rr, refund=refund)
+        return rr
+
+    @staticmethod
+    def _compute_refund(rr: ReturnRequest) -> Money:
+        from plugins.installed.orders.models import OrderItem
+
+        items_by_id = {str(it.id): it for it in OrderItem.objects.filter(order=rr.order)}
+        currency = 'USD'
+        total = Decimal('0')
+        for entry in rr.items or []:
+            oi = items_by_id.get(str(entry.get('order_item_id', '')))
+            if not oi:
+                continue
+            qty = min(int(entry.get('quantity', 0) or 0), oi.quantity)
+            currency = str(oi.unit_price.currency)
+            total += Decimal(oi.unit_price.amount) * qty
+        return Money(total.quantize(Decimal('0.01')), currency)

@@ -1,0 +1,92 @@
+"""Refund + Return tests."""
+from __future__ import annotations
+
+from decimal import Decimal
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from djmoney.money import Money
+
+from core.agents import agent_registry
+from plugins.installed.catalog.models import Product
+from plugins.installed.orders.models import Order, OrderItem
+from plugins.installed.orders.refunds import RefundService, ReturnRequest, ReturnService
+
+
+User = get_user_model()
+
+
+def _setup_order(amount='25', qty=2):
+    user = User.objects.create_user(username='c', email='c@example.com', password='x')
+    p = Product.objects.create(
+        name='Book', slug='book', sku='B', price=Money(Decimal(amount), 'USD'), status='active',
+    )
+    order = Order.objects.create(
+        customer=user, email='c@example.com',
+        subtotal=Money(Decimal(amount) * qty, 'USD'),
+        total=Money(Decimal(amount) * qty, 'USD'),
+    )
+    item = OrderItem.objects.create(
+        order=order, product=p, product_name=p.name, sku=p.sku,
+        quantity=qty, unit_price=p.price, total_price=p.price * qty,
+    )
+    return order, item
+
+
+class RefundServiceTests(TestCase):
+
+    def test_process_creates_refund(self):
+        order, _ = _setup_order()
+        refund = RefundService.process(
+            order=order, amount=Money(Decimal('10'), 'USD'), reason='customer_request',
+        )
+        self.assertEqual(refund.amount.amount, Decimal('10'))
+        self.assertTrue(refund.is_processed)
+
+    def test_process_is_idempotent(self):
+        order, _ = _setup_order()
+        r1 = RefundService.process(order=order, amount=Money(Decimal('5'), 'USD'))
+        r2 = RefundService.process(order=order, amount=Money(Decimal('5'), 'USD'))
+        self.assertEqual(r1.id, r2.id)
+
+
+class ReturnRequestTests(TestCase):
+
+    def test_create_assigns_rma_number(self):
+        order, item = _setup_order()
+        rr = ReturnService.create_request(
+            order=order, items=[{'order_item_id': str(item.id), 'quantity': 1}],
+            reason='defective',
+        )
+        self.assertTrue(rr.rma_number.startswith('RMA-'))
+        self.assertEqual(rr.state, 'requested')
+
+    def test_approve_computes_refund_amount(self):
+        order, item = _setup_order(amount='30', qty=2)
+        rr = ReturnService.create_request(
+            order=order, items=[{'order_item_id': str(item.id), 'quantity': 2}],
+        )
+        ReturnService.approve(rr)
+        rr.refresh_from_db()
+        self.assertEqual(rr.state, 'approved')
+        self.assertEqual(rr.refund_amount.amount, Decimal('60.00'))
+
+    def test_full_flow_to_refunded(self):
+        order, item = _setup_order(amount='20', qty=1)
+        rr = ReturnService.create_request(
+            order=order, items=[{'order_item_id': str(item.id), 'quantity': 1}],
+        )
+        ReturnService.approve(rr)
+        ReturnService.mark_received_and_refund(rr)
+        rr.refresh_from_db()
+        self.assertEqual(rr.state, 'refunded')
+        self.assertIsNotNone(rr.refund_id)
+
+
+class RefundAgentToolsTests(TestCase):
+
+    def test_tools_registered(self):
+        names = {t.name for t in agent_registry.platform_tools()}
+        self.assertIn('orders.refund', names)
+        self.assertIn('returns.list', names)
+        self.assertIn('returns.approve', names)
