@@ -62,49 +62,56 @@ class InventoryService:
         ).exists():
             return 0
 
+        from plugins.installed.inventory.allocator import plan_allocation
+
         movements = 0
         for item in order.items.select_related('variant').all():
             if item.variant_id is None or item.quantity <= 0:
                 continue
-            try:
-                with transaction.atomic():
-                    sl = (
-                        StockLevel.objects
-                        .select_for_update()
-                        .filter(variant_id=item.variant_id)
-                        .order_by('-quantity')
-                        .first()
-                    )
-                    if sl is None:
-                        logger.warning(
-                            'inventory: no StockLevel for variant %s on order %s',
-                            item.variant_id, order.order_number,
-                        )
-                        continue
-                    # Re-check inside the lock to avoid the race that lets two
-                    # concurrent orders both pass an outside-the-lock check.
-                    if sl.available_quantity < item.quantity:
-                        raise InsufficientStockError(
-                            f'Short stock for variant {item.variant_id}: '
-                            f'wanted {item.quantity}, available {sl.available_quantity}'
-                        )
-                    sl.reserved_quantity = (sl.reserved_quantity or 0) + item.quantity
-                    sl.save(update_fields=['reserved_quantity', 'updated_at'])
-                    StockMovement.objects.create(
-                        stock_level=sl,
-                        movement_type='reserve',
-                        quantity_change=0,
-                        quantity_before=sl.quantity,
-                        quantity_after=sl.quantity,
-                        reference=order.order_number,
-                        notes=f'Reserved {item.quantity}× for {order.order_number}',
-                    )
-                    movements += 1
-            except DatabaseError as e:
-                logger.error(
-                    'inventory: reserve failed for order=%s variant=%s: %s',
-                    order.order_number, item.variant_id, e, exc_info=True,
+            plan = plan_allocation(item.variant_id, item.quantity)
+            if not plan:
+                logger.warning(
+                    'inventory: no StockLevel for variant %s on order %s',
+                    item.variant_id, order.order_number,
                 )
+                continue
+            allocated = sum(a.qty for a in plan)
+            if allocated < item.quantity:
+                raise InsufficientStockError(
+                    f'Short stock for variant {item.variant_id}: '
+                    f'wanted {item.quantity}, allocated {allocated}'
+                )
+            for alloc in plan:
+                try:
+                    with transaction.atomic():
+                        sl = (
+                            StockLevel.objects
+                            .select_for_update()
+                            .get(pk=alloc.stock_level.pk)
+                        )
+                        if sl.available_quantity < alloc.qty:
+                            raise InsufficientStockError(
+                                f'Lost race on level {sl.pk}: wanted {alloc.qty}, '
+                                f'available {sl.available_quantity}'
+                            )
+                        sl.reserved_quantity = (sl.reserved_quantity or 0) + alloc.qty
+                        sl.save(update_fields=['reserved_quantity', 'updated_at'])
+                        StockMovement.objects.create(
+                            stock_level=sl,
+                            movement_type='reserve',
+                            quantity_change=0,
+                            quantity_before=sl.quantity,
+                            quantity_after=sl.quantity,
+                            reference=order.order_number,
+                            notes=f'Reserved {alloc.qty}× for {order.order_number}',
+                        )
+                        movements += 1
+                except DatabaseError as e:
+                    logger.error(
+                        'inventory: reserve failed for order=%s variant=%s level=%s: %s',
+                        order.order_number, item.variant_id, alloc.stock_level.pk, e,
+                        exc_info=True,
+                    )
         return movements
 
     @classmethod
