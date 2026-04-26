@@ -1,0 +1,55 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Promotions · Morpheus{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">Promotions</h1>
+
+<div class="card mb-6">
+  <table class="morph-table">
+    <thead>
+      <tr>
+        <th>Name</th><th>Slug</th><th>Type</th><th>Priority</th>
+        <th>Channels</th><th>Coupon gate</th><th>Used</th><th>Active</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for p in promotions %}
+      <tr>
+        <td>{{ p.name }}</td>
+        <td><code>{{ p.slug }}</code></td>
+        <td>{{ p.get_type_display }}</td>
+        <td>{{ p.priority }}</td>
+        <td>{% if p.channels %}<code style="font-size:.75rem;">{{ p.channels|join:", " }}</code>{% else %}<span class="meta">all</span>{% endif %}</td>
+        <td>{% if p.requires_coupon %}<code>{{ p.requires_coupon }}</code>{% else %}<span class="meta">—</span>{% endif %}</td>
+        <td>{{ p.times_used }}{% if p.usage_limit %} / {{ p.usage_limit }}{% endif %}</td>
+        <td>{% if p.is_active %}<span class="pill pill-success">on</span>{% else %}<span class="pill">off</span>{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-muted);">
+        No promotions yet — create one via the Morpheus assistant or the Django admin.
+      </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2 class="text-base font-semibold mb-2">Recent applications</h2>
+<div class="card">
+  <table class="morph-table">
+    <thead><tr><th>Promotion</th><th>Order</th><th>Customer</th><th>Discount</th><th>When</th></tr></thead>
+    <tbody>
+    {% for a in recent_applications %}
+      <tr>
+        <td>{{ a.promotion.name }}</td>
+        <td><code style="font-size:.75rem;">{{ a.order_id|default:"—" }}</code></td>
+        <td><code style="font-size:.75rem;">{{ a.customer_id|default:"—" }}</code></td>
+        <td>{{ a.discount_amount }} {{ a.currency }}</td>
+        <td>{{ a.applied_at|date:"M j H:i" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">No applications yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
