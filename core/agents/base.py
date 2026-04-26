@@ -74,6 +74,10 @@ class MorpheusAgent:
     # rather than silently bleeding tools across sibling agent classes.
     default_tools: tuple[Tool, ...] = ()
 
+    # Skill names this agent opts into. Each Skill contributes tools and
+    # an optional system-prompt prelude. Resolved against `core.agents.skill_registry`.
+    uses_skills: tuple[str, ...] = ()
+
     # ── Class-time validation ──────────────────────────────────────────────────
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
@@ -98,27 +102,49 @@ class MorpheusAgent:
     # ── Hooks for subclasses ───────────────────────────────────────────────────
 
     def get_system_prompt(self, context: dict[str, Any] | None = None) -> str:
-        """Render the system prompt. Override for dynamic prompts."""
+        """Render the system prompt. Override for dynamic prompts.
+
+        Each opted-in Skill prepends its `system_prompt_prelude` (if any)
+        before the base prompt — so a Concierge that opts into the
+        `storefront_concierge` skill picks up that skill's preamble for
+        free.
+        """
+        from core.agents.skills import skill_registry
+        skills = skill_registry.resolve(self.uses_skills or ())
+        preludes = [s.system_prompt_prelude for s in skills if s.system_prompt_prelude]
+
         if not self.prompt_name:
-            return self.description or f'You are the {self.label} agent.'
-        from core.agents.prompts import prompt_registry
-        try:
-            prompt = prompt_registry.get(self.prompt_name, self.prompt_version)
-        except KeyError:
-            return self.description or f'You are the {self.label} agent.'
-        return prompt.render(**(context or {}))
+            base = self.description or f'You are the {self.label} agent.'
+        else:
+            from core.agents.prompts import prompt_registry
+            try:
+                prompt = prompt_registry.get(self.prompt_name, self.prompt_version)
+                base = prompt.render(**(context or {}))
+            except KeyError:
+                base = self.description or f'You are the {self.label} agent.'
+
+        return '\n\n'.join([*preludes, base]).strip()
 
     def get_tools(self) -> list[Tool]:
         """Return the tools this agent can call.
 
-        Default: `default_tools` plus any platform tool whose scopes are a
-        subset of this agent's scopes (collected from the agent registry).
+        Default: `default_tools` ∪ tools from every opted-in Skill ∪ any
+        platform tool whose scopes are a subset of this agent's scopes.
         Override to filter further or to add per-instance tools.
         """
         from core.agents.registry import agent_registry
+        from core.agents.skills import skill_registry
 
         out: list[Tool] = list(self.default_tools or [])
         seen_names = {t.name for t in out}
+
+        for skill in skill_registry.resolve(self.uses_skills or ()):
+            for tool in skill.tools:
+                if tool.name in seen_names:
+                    continue
+                out.append(tool)
+                seen_names.add(tool.name)
+
         for tool in agent_registry.platform_tools():
             if tool.name in seen_names:
                 continue

@@ -10,6 +10,7 @@ app_name = 'agent_core_dash'
 urlpatterns = [
     path('', views.runs_dashboard_view, name='runs'),
     path('console/', views.merchant_ops_chat_view, name='console'),
+    path('observability/', views.observability_view, name='observability'),
     path('background/', views.background_agents_view, name='background'),
     path('background/<uuid:bg_id>/<str:action>/', views.background_agent_action_view, name='background_action'),
     path('<uuid:run_id>/', views.run_detail_view, name='run_detail'),

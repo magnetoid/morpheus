@@ -1,0 +1,104 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Agent observability · Morpheus{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-semibold">Agent observability</h1>
+  <form method="get" style="display:flex;gap:.5rem;align-items:center;">
+    <label class="meta">Window
+      <select name="days" onchange="this.form.submit()" class="form-input">
+        {% for d in "1,7,30,90"|cut:" "|slugify|stringformat:"s"|join:"" %}{% endfor %}
+        <option value="1" {% if days == 1 %}selected{% endif %}>1 day</option>
+        <option value="7" {% if days == 7 %}selected{% endif %}>7 days</option>
+        <option value="30" {% if days == 30 %}selected{% endif %}>30 days</option>
+        <option value="90" {% if days == 90 %}selected{% endif %}>90 days</option>
+      </select>
+    </label>
+  </form>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+  <div class="card card-padded">
+    <p class="meta">Runs</p>
+    <p class="display display-l">{{ totals.n|default:"0" }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="meta">Tokens</p>
+    <p class="display display-l">{{ totals.tokens|default:"0" }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="meta">Tool calls</p>
+    <p class="display display-l">{{ totals.tools|default:"0" }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="meta">Avg duration</p>
+    <p class="display display-l">{{ totals.avg_ms|default:0|floatformat:0 }}ms</p>
+  </div>
+</div>
+
+<h2 class="text-base font-semibold mb-2">By agent</h2>
+<div class="card mb-6">
+  <table class="morph-table">
+    <thead><tr><th>Agent</th><th>Runs</th><th>Tokens</th><th>Tool calls</th><th>Avg duration</th></tr></thead>
+    <tbody>
+    {% for row in by_agent %}
+      <tr>
+        <td><code>{{ row.agent_name }}</code></td>
+        <td>{{ row.n }}</td>
+        <td>{{ row.tokens|default:"0" }}</td>
+        <td>{{ row.tools|default:"0" }}</td>
+        <td>{{ row.avg_ms|default:0|floatformat:0 }}ms</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">
+        No runs in window.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+  <div class="card">
+    <table class="morph-table">
+      <thead><tr><th colspan="2">By state</th></tr></thead>
+      <tbody>
+      {% for row in by_state %}
+        <tr><td>{{ row.state }}</td><td>{{ row.n }}</td></tr>
+      {% empty %}
+        <tr><td colspan="2" style="text-align:center;padding:1rem;color:var(--text-muted);">No runs.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <table class="morph-table">
+      <thead><tr><th colspan="2">Top tools</th></tr></thead>
+      <tbody>
+      {% for row in top_tools %}
+        <tr><td><code>{{ row.name }}</code></td><td>{{ row.n }}</td></tr>
+      {% empty %}
+        <tr><td colspan="2" style="text-align:center;padding:1rem;color:var(--text-muted);">No tool calls.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h2 class="text-base font-semibold mb-2">Recent failures</h2>
+<div class="card">
+  <table class="morph-table">
+    <thead><tr><th>When</th><th>Agent</th><th>Error</th></tr></thead>
+    <tbody>
+    {% for r in failures %}
+      <tr>
+        <td><a href="{% url 'agent_core_dash:run_detail' r.id %}">{{ r.started_at|date:"M j H:i" }}</a></td>
+        <td><code>{{ r.agent_name }}</code></td>
+        <td style="max-width:36rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r.error|truncatechars:200 }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="3" style="text-align:center;padding:2rem;color:var(--text-muted);">No failures in window.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
