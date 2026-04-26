@@ -1,0 +1,28 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Affiliates · Morpheus admin{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">Affiliates</h1>
+<div class="card">
+  <table class="morph-table">
+    <thead>
+      <tr><th>Code</th><th>Customer</th><th>Program</th><th>Clicks</th><th>Conversions</th><th>Lifetime payout</th><th>Active</th></tr>
+    </thead>
+    <tbody>
+      {% for a in affiliates %}
+      <tr>
+        <td><code>{{ a.code }}</code></td>
+        <td>{{ a.customer.email|default:"—" }}</td>
+        <td>{{ a.program.name|default:"—" }}</td>
+        <td>{{ a.click_count }}</td>
+        <td>{{ a.conversion_count }}</td>
+        <td>{{ a.lifetime_payout|default:"—" }}</td>
+        <td>{% if a.is_active %}<span class="pill pill-success">active</span>{% else %}<span class="pill pill-neutral">paused</span>{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" style="text-align:center; padding: 2rem; color: var(--text-muted);">No affiliates yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

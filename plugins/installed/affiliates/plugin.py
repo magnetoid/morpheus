@@ -30,3 +30,28 @@ class AffiliatesPlugin(MorpheusPlugin):
             return
         from plugins.installed.affiliates.services import attribute_order
         attribute_order(order=order, affiliate_code=code)
+
+    def contribute_agent_tools(self) -> list:
+        from plugins.installed.affiliates.agent_tools import (
+            create_affiliate_tool, list_affiliates_tool,
+            mark_payout_paid_tool, pending_payouts_tool,
+        )
+        return [
+            list_affiliates_tool, pending_payouts_tool,
+            mark_payout_paid_tool, create_affiliate_tool,
+        ]
+
+    def contribute_dashboard_pages(self) -> list:
+        from plugins.contributions import DashboardPage
+        return [
+            DashboardPage(
+                label='Affiliates', slug='list',
+                view='plugins.installed.affiliates.dashboard.affiliates_list',
+                icon='link', section='growth', order=10,
+            ),
+            DashboardPage(
+                label='Payouts', slug='payouts',
+                view='plugins.installed.affiliates.dashboard.payouts_list',
+                icon='wallet', section='growth', order=20,
+            ),
+        ]
