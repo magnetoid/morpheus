@@ -61,6 +61,9 @@ MORPHEUS_DEFAULT_PLUGINS = [
     'plugins.installed.shipping',
     'plugins.installed.wishlist',
     'plugins.installed.webhooks_ui',
+    'plugins.installed.gift_cards',
+    'plugins.installed.b2b',
+    'plugins.installed.subscriptions',
 ]
 
 # ── Extra plugins installed by merchant via .env ───────────────────────────────
@@ -152,6 +155,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'core.context_processors.store_settings',
                 'core.context_processors.cart_context',
+                'core.context_processors.display_currency',
                 'themes.context_processors.theme_context',
                 'plugins.context_processors.plugin_context',
             ],
