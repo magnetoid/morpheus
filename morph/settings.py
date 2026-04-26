@@ -32,6 +32,9 @@ MORPHEUS_PLUGINS_DIR = BASE_DIR / 'plugins' / 'installed'
 MORPHEUS_THEMES_DIR = BASE_DIR / 'themes' / 'library'
 MORPHEUS_ACTIVE_THEME = config('MORPHEUS_ACTIVE_THEME', default='dot_books')
 
+# Display version next to the logo in the admin sidebar.
+MORPHEUS_VERSION = config('MORPHEUS_VERSION', default='v0.1.0')
+
 # ── Default plugins (always in INSTALLED_APPS — they have models) ──────────────
 MORPHEUS_DEFAULT_PLUGINS = [
     'plugins.installed.catalog',

@@ -2,19 +2,34 @@
 from __future__ import annotations
 
 from plugins.base import MorpheusPlugin
+from plugins.contributions import SettingsPanel
 
 
 class DemoDataPlugin(MorpheusPlugin):
     name = 'demo_data'
     label = 'Demo Data'
-    version = '0.1.0'
+    version = '0.2.0'
     description = (
-        'Idempotent seed data for the bookstore demo: books, categories, '
-        'collections, customers, orders. Provides `manage.py morph_seed_demo`.'
+        'Idempotent seed data for the bookstore demo + on-demand random '
+        'product generator themed by the active storefront theme. Adds '
+        'a settings panel with a one-click generator.'
     )
     has_models = False
-    requires_plugins: list[str] = []  # Pure CLI; no Django-level deps at boot
+    requires_plugins: list[str] = []
 
     def ready(self) -> None:
-        # Nothing to register; the management command is auto-discovered.
-        pass
+        self.register_urls(
+            'plugins.installed.demo_data.urls',
+            prefix='dashboard/apps/demo_data/',
+            namespace='demo_data',
+        )
+
+    def contribute_settings_panel(self) -> SettingsPanel:
+        return SettingsPanel(
+            label='Demo Data',
+            description=(
+                'Generate sample data on demand — products are themed by '
+                'the active storefront theme.'
+            ),
+            schema={'type': 'object', 'properties': {}},
+        )

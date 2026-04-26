@@ -26,6 +26,7 @@ class DotBooksTheme(MorpheusTheme):
     )
     author = 'Morph Team'
     supports_plugins = ['storefront', 'catalog', 'orders']
+    demo_topic = 'bookstore'
 
     def get_config_schema(self) -> dict:
         return {
