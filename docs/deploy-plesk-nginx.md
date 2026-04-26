@@ -148,9 +148,42 @@ If `/healthz` works through Plesk but pages 404, check the
 
 ## Common issues
 
-**`502 Bad Gateway` from Plesk**
+**`502 Bad Gateway` from Plesk** *(direct port mapping setup)*
+If your Plesk vhost forwards directly to a host port (e.g.
+`proxy_pass http://127.0.0.1:9990;`) instead of going through Coolify
+Traefik, that port mapping must be on the **`web` service** in
+`docker-compose.yaml`. **Coolify will overwrite the compose file on
+every redeploy from git** — if the mapping disappears, re-add it on the
+host:
+
+```yaml
+# In /data/coolify/applications/<uuid>/docker-compose.yaml under `web:`
+expose:
+    - '8000'
+ports:
+    - '127.0.0.1:9990:8000'   # ← Plesk forwards here
+```
+
+Then `docker compose up -d --force-recreate web`. Verify with
+`ss -tlnp | grep 9990`.
+
+**`502 Bad Gateway` from Plesk** *(Traefik setup)*
 Coolify Traefik is not running on `127.0.0.1:80`. Check `docker ps |
 grep coolify-proxy` on the host.
+
+**`400 Bad Request` after a Coolify redeploy**
+Coolify reverted `SERVICE_FQDN_WEB` (and the related `SERVICE_URL_*` /
+`COOLIFY_FQDN`) to a previous value (e.g. `dotbooks.shop` instead of
+`dotbooks.store`). Django then rejects the host. Fix on the host:
+
+```bash
+cd /data/coolify/applications/<uuid>/
+sed -i 's/old\.domain/new.domain/g' .env docker-compose.yaml
+docker compose up -d --force-recreate web worker beat
+```
+
+The proper fix is to update Coolify's project domain in the UI so it
+stops reverting on the next pull.
 
 **`502 Bad Gateway` from Traefik**
 The Morpheus `web` container is not healthy. Coolify dashboard → app →
