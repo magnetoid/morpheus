@@ -1,0 +1,23 @@
+{# Renders a CMS Form. Themes can shadow cms/_form.html. #}
+<form method="post" action="/forms/{{ form.key }}/submit/" class="cms-form" style="display:grid; gap: 1rem; max-width: 480px;">
+  {% csrf_token %}
+  {% for field in form.fields %}
+  <div>
+    {% if field.label %}<label class="block text-sm" style="margin-bottom:.25rem;">{{ field.label }}{% if field.required %} *{% endif %}</label>{% endif %}
+    {% if field.type == "textarea" %}
+    <textarea name="{{ field.name }}" {% if field.required %}required{% endif %}
+              placeholder="{{ field.placeholder|default:'' }}" rows="{{ field.rows|default:5 }}"
+              class="input"></textarea>
+    {% elif field.type == "select" %}
+    <select name="{{ field.name }}" {% if field.required %}required{% endif %} class="input">
+      {% for opt in field.options %}<option value="{{ opt.value }}">{{ opt.label }}</option>{% endfor %}
+    </select>
+    {% else %}
+    <input type="{{ field.type|default:'text' }}" name="{{ field.name }}"
+           {% if field.required %}required{% endif %}
+           placeholder="{{ field.placeholder|default:'' }}" class="input">
+    {% endif %}
+  </div>
+  {% endfor %}
+  <div><button type="submit" class="btn btn-primary">{{ form.submit_label }}</button></div>
+</form>

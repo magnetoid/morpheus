@@ -1,0 +1,19 @@
+{# Themes can shadow cms/_menu.html for custom presentation. #}
+<nav class="cms-menu cms-menu-{{ menu.key }}" aria-label="{{ menu.label }}">
+  <ul style="display:flex; gap:1rem; list-style:none; padding:0; margin:0; flex-wrap:wrap;">
+  {% for item in menu.items %}
+    <li>
+      <a href="{{ item.url }}" {% if item.target %}target="{{ item.target }}"{% endif %}>
+        {% if item.icon %}<span aria-hidden="true">{{ item.icon }}</span> {% endif %}{{ item.label }}
+      </a>
+      {% if item.children %}
+      <ul style="list-style:none; padding-left:1rem;">
+        {% for c in item.children %}
+        <li><a href="{{ c.url }}" {% if c.target %}target="{{ c.target }}"{% endif %}>{{ c.label }}</a></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+</nav>

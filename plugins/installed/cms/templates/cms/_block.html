@@ -1,0 +1,18 @@
+{# Default Block renderer — themes can override by shadowing cms/_block.html. #}
+{% if block.kind == "html" %}
+  <div class="cms-block cms-block-html">{{ block.body|safe }}</div>
+{% elif block.kind == "image" %}
+  <figure class="cms-block cms-block-image">
+    {% if block.image_url %}<img src="{{ block.image_url }}" alt="{{ block.label }}">{% endif %}
+    {% if block.body %}<figcaption>{{ block.body|safe }}</figcaption>{% endif %}
+  </figure>
+{% elif block.kind == "callout" %}
+  <aside class="cms-block cms-block-callout" style="background:var(--paper-2,#f5f1e8); padding:1.25rem; border-radius:6px;">
+    <p style="font-family:var(--serif,serif); font-size:1.1rem;">{{ block.body|safe }}</p>
+    {% if block.cta_url %}<a href="{{ block.cta_url }}" class="btn btn-primary" style="margin-top:.75rem;">{{ block.cta_label|default:"Learn more" }}</a>{% endif %}
+  </aside>
+{% elif block.kind == "cta" %}
+  <a href="{{ block.cta_url }}" class="btn btn-primary cms-block cms-block-cta">{{ block.cta_label|default:block.label }}</a>
+{% elif block.kind == "embed" %}
+  <div class="cms-block cms-block-embed">{{ block.body|safe }}</div>
+{% endif %}
