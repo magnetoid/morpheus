@@ -1,0 +1,61 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}SEO settings · Morpheus{% endblock %}
+
+{% block content %}
+<a href="{% url 'seo_dashboard:overview' %}" class="text-sm text-[color:var(--text-muted)]">← SEO</a>
+<h1 class="text-xl font-semibold mt-2 mb-4">Site SEO settings</h1>
+
+<form method="post" class="card card-padded" style="display:grid; gap:1rem; max-width:720px;">
+  {% csrf_token %}
+
+  <h3 class="font-semibold">Organization</h3>
+  <label class="block">Name <input type="text" name="organization_name" value="{{ s.organization_name }}" class="input"></label>
+  <label class="block">Logo URL <input type="url" name="organization_logo_url" value="{{ s.organization_logo_url }}" class="input"></label>
+  <label class="block">Default OG image <input type="url" name="default_og_image" value="{{ s.default_og_image }}" class="input"></label>
+
+  <h3 class="font-semibold mt-4">Twitter</h3>
+  <label class="block">Handle (no @) <input type="text" name="twitter_handle" value="{{ s.twitter_handle }}" class="input"></label>
+  <label class="block">Card type
+    <select name="twitter_card_default" class="input">
+      <option value="summary_large_image" {% if s.twitter_card_default == "summary_large_image" %}selected{% endif %}>Summary (large image)</option>
+      <option value="summary" {% if s.twitter_card_default == "summary" %}selected{% endif %}>Summary</option>
+    </select>
+  </label>
+
+  <h3 class="font-semibold mt-4">Social profiles (sameAs)</h3>
+  <label class="block">Facebook <input type="url" name="facebook_url" value="{{ s.facebook_url }}" class="input"></label>
+  <label class="block">Instagram <input type="url" name="instagram_url" value="{{ s.instagram_url }}" class="input"></label>
+  <label class="block">LinkedIn <input type="url" name="linkedin_url" value="{{ s.linkedin_url }}" class="input"></label>
+  <label class="block">YouTube <input type="url" name="youtube_url" value="{{ s.youtube_url }}" class="input"></label>
+  <label class="block">TikTok <input type="url" name="tiktok_url" value="{{ s.tiktok_url }}" class="input"></label>
+
+  <h3 class="font-semibold mt-4">Search engine verification</h3>
+  <label class="block">Google site verification <input type="text" name="google_site_verification" value="{{ s.google_site_verification }}" class="input"></label>
+  <label class="block">Bing verification <input type="text" name="bing_verification" value="{{ s.bing_verification }}" class="input"></label>
+  <label class="block">Pinterest verification <input type="text" name="pinterest_verification" value="{{ s.pinterest_verification }}" class="input"></label>
+  <label class="block">Facebook domain verification <input type="text" name="facebook_domain_verification" value="{{ s.facebook_domain_verification }}" class="input"></label>
+
+  <h3 class="font-semibold mt-4">Title formatting</h3>
+  <label class="block">Title template <input type="text" name="title_template" value="{{ s.title_template }}" class="input"></label>
+  <p class="text-xs text-[color:var(--text-muted)]">Variables: <code>{title}</code>, <code>{site_name}</code>, <code>{category}</code></p>
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:.5rem;">
+    <label class="block">Title max length <input type="number" name="title_max_length" value="{{ s.title_max_length }}" class="input"></label>
+    <label class="block">Description max length <input type="number" name="description_max_length" value="{{ s.description_max_length }}" class="input"></label>
+  </div>
+
+  <h3 class="font-semibold mt-4">Robots</h3>
+  <label class="block">Noindex query params (comma-separated)
+    <input type="text" name="noindex_query_params" value="{{ s.noindex_query_params|join:',' }}" class="input">
+  </label>
+  <label class="text-sm"><input type="checkbox" name="enable_sitelinks_search" {% if s.enable_sitelinks_search %}checked{% endif %}> Enable sitelinks search action</label>
+
+  <h3 class="font-semibold mt-4">AI / LLM discovery</h3>
+  <label class="text-sm"><input type="checkbox" name="llms_txt_enabled" {% if s.llms_txt_enabled %}checked{% endif %}> Serve <code>/llms.txt</code> + <code>/llms-full.txt</code></label>
+  <label class="text-sm"><input type="checkbox" name="ai_shopping_feed_enabled" {% if s.ai_shopping_feed_enabled %}checked{% endif %}> Serve <code>/ai/products.json</code> (schema.org product feed)</label>
+  <label class="block">/llms.txt intro
+    <textarea name="llms_txt_intro" rows="3" class="input">{{ s.llms_txt_intro }}</textarea>
+  </label>
+
+  <button type="submit" class="btn btn-primary">Save settings</button>
+</form>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}SEO audit · Morpheus{% endblock %}
+
+{% block content %}
+<a href="{% url 'seo_dashboard:overview' %}" class="text-sm text-[color:var(--text-muted)]">← SEO</a>
+<div class="flex items-center justify-between mt-2 mb-4">
+  <h1 class="text-xl font-semibold">SEO audit</h1>
+  <form method="post" id="audit-form"><button type="submit" class="btn btn-primary">Run audits now</button>{% csrf_token %}</form>
+</div>
+
+<div class="card">
+  <table class="morph-table">
+    <thead><tr><th>Score</th><th>Target</th><th>Issues</th><th>Top suggestion</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>
+          <span class="pill {% if r.score >= 80 %}pill-success{% elif r.score >= 50 %}pill-warn{% else %}pill-danger{% endif %}">{{ r.score }}/100</span>
+        </td>
+        <td>{{ r.target|default:"(deleted)"|truncatechars:60 }}</td>
+        <td>{{ r.issues|length }}</td>
+        <td style="font-size:.85rem;">{% if r.suggestions %}{{ r.suggestions.0 }}{% else %}—{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" style="text-align:center;padding:2rem;color:var(--text-muted);">No audits yet — click "Run audits now".</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

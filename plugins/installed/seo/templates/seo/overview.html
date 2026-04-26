@@ -1,0 +1,38 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}SEO · Morpheus{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">SEO</h1>
+
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+  <div class="card card-padded"><p class="text-xs uppercase text-[color:var(--text-muted)]">Meta overrides</p><p class="text-2xl font-semibold mt-1">{{ meta_count }}</p></div>
+  <div class="card card-padded"><p class="text-xs uppercase text-[color:var(--text-muted)]">Active redirects</p><p class="text-2xl font-semibold mt-1">{{ redirect_count }}</p></div>
+  <div class="card card-padded"><p class="text-xs uppercase text-[color:var(--text-muted)]">Open 404s</p><p class="text-2xl font-semibold mt-1" {% if not_found_count %}style="color:var(--warn);"{% endif %}>{{ not_found_count }}</p></div>
+  <div class="card card-padded"><p class="text-xs uppercase text-[color:var(--text-muted)]">Audited products</p><p class="text-2xl font-semibold mt-1">{{ audit_count }}</p></div>
+  <div class="card card-padded"><p class="text-xs uppercase text-[color:var(--text-muted)]">Tracked keywords</p><p class="text-2xl font-semibold mt-1">{{ tracked_keywords }}</p></div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+  <div class="card card-padded">
+    <h3 class="font-semibold mb-3">Quick actions</h3>
+    <div style="display:grid; gap:.5rem;">
+      <a href="{% url 'seo_dashboard:settings' %}" class="btn">Site SEO settings</a>
+      <a href="{% url 'seo_dashboard:bulk_meta' %}" class="btn">Bulk-edit titles &amp; descriptions</a>
+      <a href="{% url 'seo_dashboard:audit' %}" class="btn">Run product audits</a>
+      <a href="{% url 'seo_dashboard:not_found' %}" class="btn">Review 404s</a>
+      <a href="{% url 'seo_dashboard:keywords' %}" class="btn">Tracked keywords</a>
+      <a href="/sitemap.xml" target="_blank" class="btn-link">View sitemap.xml</a>
+      <a href="/llms.txt" target="_blank" class="btn-link">View /llms.txt</a>
+      <a href="/ai/products.json" target="_blank" class="btn-link">View AI shopping feed</a>
+    </div>
+  </div>
+  <div class="card card-padded">
+    <h3 class="font-semibold mb-3">Lowest scoring products</h3>
+    {% for r in lowest_scores %}
+    <div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);">
+      <span>{{ r.target|default:"(deleted)" }}</span><strong>{{ r.score }}/100</strong>
+    </div>
+    {% empty %}<p class="text-sm text-[color:var(--text-muted)]">No audits yet — run them.</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}

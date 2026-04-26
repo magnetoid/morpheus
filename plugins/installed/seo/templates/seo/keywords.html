@@ -1,0 +1,33 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Keywords · SEO{% endblock %}
+
+{% block content %}
+<a href="{% url 'seo_dashboard:overview' %}" class="text-sm text-[color:var(--text-muted)]">← SEO</a>
+<h1 class="text-xl font-semibold mt-2 mb-4">Tracked keywords</h1>
+
+<form method="post" class="card card-padded mb-4" style="display:grid; grid-template-columns: 2fr 1fr 2fr 1fr; gap:.5rem; align-items:end;">
+  {% csrf_token %}
+  <label>Keyword <input type="text" name="keyword" required class="input"></label>
+  <label>Locale <input type="text" name="locale" value="en-US" class="input"></label>
+  <label>Target URL <input type="text" name="target_url" placeholder="/products/foo/" class="input"></label>
+  <button type="submit" class="btn btn-primary">Add</button>
+</form>
+
+<div class="card">
+  <table class="morph-table">
+    <thead><tr><th>Keyword</th><th>Locale</th><th>Target</th><th>Last position</th><th>Last checked</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.keyword }}</td><td>{{ r.locale }}</td>
+        <td><code style="font-size:.85rem;">{{ r.target_url|default:"—" }}</code></td>
+        <td>{{ r.last_position|default:"—" }}</td>
+        <td>{{ r.last_checked_at|date:"M j"|default:"never" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">No tracked keywords yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
