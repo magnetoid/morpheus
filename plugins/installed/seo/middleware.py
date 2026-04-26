@@ -27,7 +27,16 @@ class SeoRedirectMiddleware:
         from plugins.installed.seo.services import resolve_redirect
         target = resolve_redirect(path)
         if target is None:
-            return self.get_response(request)
+            response = self.get_response(request)
+            # Log 404s on storefront paths so we can surface auto-redirect candidates.
+            if (response.status_code == 404
+                    and not any(path.startswith(p) for p in self.SKIP_PREFIXES)):
+                try:
+                    from plugins.installed.seo.services import record_404
+                    record_404(path=path, referrer=request.META.get('HTTP_REFERER', '') or '')
+                except Exception:  # noqa: BLE001
+                    pass
+            return response
         to_path, status = target
         if status == 301:
             return HttpResponsePermanentRedirect(to_path)

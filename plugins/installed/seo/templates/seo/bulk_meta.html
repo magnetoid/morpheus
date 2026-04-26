@@ -1,0 +1,26 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Bulk SEO meta · Morpheus{% endblock %}
+
+{% block content %}
+<a href="{% url 'seo_dashboard:overview' %}" class="text-sm text-[color:var(--text-muted)]">← SEO</a>
+<h1 class="text-xl font-semibold mt-2 mb-4">Bulk-edit SEO meta</h1>
+
+<form method="post" class="card">
+  {% csrf_token %}
+  <table class="morph-table">
+    <thead><tr><th>Product</th><th>SEO title</th><th>SEO description</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><strong>{{ r.product.name }}</strong><br><code style="font-size:.75rem; color:var(--text-muted);">/products/{{ r.product.slug }}/</code></td>
+        <td><input type="text" name="meta_{{ r.product.id }}_title" value="{{ r.title }}" class="input" maxlength="200"></td>
+        <td><input type="text" name="meta_{{ r.product.id }}_description" value="{{ r.description }}" class="input" maxlength="320"></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div style="padding: 1rem; border-top: 1px solid var(--border);">
+    <button type="submit" class="btn btn-primary">Save all</button>
+  </div>
+</form>
+{% endblock %}

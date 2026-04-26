@@ -125,3 +125,146 @@ class SitemapEntry(models.Model):
     last_modified = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Deep-SEO extensions: site settings, audits, keyword tracking, 404 monitor.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class SiteSeoSettings(models.Model):
+    """Singleton-style site-wide SEO defaults.
+
+    Populates JSON-LD `Organization` + `WebSite`; provides default OG image
+    + Twitter handle when SeoMeta doesn't override; carries verification
+    metas for Google Search Console / Bing / Pinterest.
+    """
+
+    TWITTER_CARD_CHOICES = [
+        ('summary', 'Summary'),
+        ('summary_large_image', 'Summary (large image)'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization_name = models.CharField(max_length=200, blank=True)
+    organization_logo_url = models.URLField(max_length=600, blank=True)
+    default_og_image = models.URLField(max_length=600, blank=True)
+    twitter_handle = models.CharField(max_length=50, blank=True, help_text='Without @')
+    twitter_card_default = models.CharField(
+        max_length=20, choices=TWITTER_CARD_CHOICES, default='summary_large_image',
+    )
+
+    # Social profiles → JSON-LD `sameAs`
+    facebook_url = models.URLField(max_length=600, blank=True)
+    instagram_url = models.URLField(max_length=600, blank=True)
+    linkedin_url = models.URLField(max_length=600, blank=True)
+    youtube_url = models.URLField(max_length=600, blank=True)
+    tiktok_url = models.URLField(max_length=600, blank=True)
+
+    # Search engine verification metas
+    google_site_verification = models.CharField(max_length=120, blank=True)
+    bing_verification = models.CharField(max_length=120, blank=True)
+    pinterest_verification = models.CharField(max_length=120, blank=True)
+    facebook_domain_verification = models.CharField(max_length=120, blank=True)
+
+    # Sitelinks search
+    enable_sitelinks_search = models.BooleanField(default=True)
+
+    # AI / LLM discovery
+    llms_txt_enabled = models.BooleanField(
+        default=True,
+        help_text='Serve /llms.txt for LLM crawlers (OpenAI, Anthropic, Perplexity, Google).',
+    )
+    llms_txt_intro = models.TextField(
+        blank=True,
+        help_text='Optional intro paragraph at the top of /llms.txt.',
+    )
+    ai_shopping_feed_enabled = models.BooleanField(
+        default=True,
+        help_text='Serve /ai/products.json — schema.org Product feed for AI shopping crawlers.',
+    )
+
+    # Title formatting
+    title_template = models.CharField(
+        max_length=200, default='{title} — {site_name}',
+        help_text='Variables: {title}, {site_name}, {category}',
+    )
+    title_max_length = models.PositiveSmallIntegerField(default=60)
+    description_max_length = models.PositiveSmallIntegerField(default=155)
+
+    # Robots directives
+    noindex_query_params = models.JSONField(
+        default=list, blank=True,
+        help_text='Auto-add noindex on URLs that contain any of these query params (e.g. ["q","sort"])',
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Site SEO settings'
+
+    def __str__(self) -> str:
+        return self.organization_name or 'Site SEO settings'
+
+    @classmethod
+    def get_solo(cls) -> 'SiteSeoSettings':
+        instance, _ = cls.objects.get_or_create(pk=cls.objects.values_list('id', flat=True).first())
+        return instance
+
+
+class SeoAuditResult(models.Model):
+    """Per-object SEO score + diagnostics. Refreshed on demand or by beat task."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.CharField(max_length=64)
+    target = GenericForeignKey('content_type', 'object_id')
+
+    score = models.PositiveSmallIntegerField(default=0, db_index=True)  # 0–100
+    issues = models.JSONField(
+        default=list,
+        help_text='List of {code, severity, message} dicts.',
+    )
+    suggestions = models.JSONField(default=list)
+    audited_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('content_type', 'object_id')
+        ordering = ['score']
+        indexes = [
+            models.Index(fields=['content_type', 'object_id']),
+            models.Index(fields=['score', '-audited_at']),
+        ]
+
+
+class TrackedKeyword(models.Model):
+    """A keyword the merchant cares about, optionally tied to a target page."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    keyword = models.CharField(max_length=200, db_index=True)
+    target_url = models.CharField(max_length=500, blank=True)
+    locale = models.CharField(max_length=10, default='en-US')
+    notes = models.TextField(blank=True)
+    last_position = models.PositiveSmallIntegerField(null=True, blank=True)
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('keyword', 'locale')
+        ordering = ['keyword']
+
+
+class NotFoundLog(models.Model):
+    """Aggregated 404 log — used to surface auto-redirect candidates."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    path = models.CharField(max_length=500, unique=True, db_index=True)
+    hit_count = models.PositiveIntegerField(default=1)
+    referrer = models.CharField(max_length=500, blank=True)
+    last_seen_at = models.DateTimeField(auto_now=True, db_index=True)
+    first_seen_at = models.DateTimeField(auto_now_add=True)
+    suggested_target = models.CharField(max_length=500, blank=True)
+    is_resolved = models.BooleanField(default=False, db_index=True)
+
+    class Meta:
+        ordering = ['-hit_count', '-last_seen_at']

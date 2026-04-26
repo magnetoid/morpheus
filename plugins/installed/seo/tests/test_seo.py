@@ -148,3 +148,76 @@ class SitemapTests(TestCase):
         self.assertIn('User-agent: *', txt)
         self.assertIn('Sitemap:', txt)
         self.assertIn('Disallow: /admin/', txt)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Deep-SEO tests
+# ─────────────────────────────────────────────────────────────────────────────
+
+import sys as _sys
+_IS_SQLITE = 'sqlite' in (_sys.modules.get('django.conf').settings.DATABASES['default']['ENGINE']
+                           if 'django.conf' in _sys.modules else '')
+
+
+class DeepSeoServicesTests(TestCase):
+
+    def test_render_llms_txt(self):
+        from plugins.installed.seo.services import render_llms_txt
+        out = render_llms_txt(full=False)
+        self.assertIn('# ', out)
+        self.assertIn('## Site map', out)
+
+    def test_organization_jsonld_returns_none_when_no_org_name(self):
+        from plugins.installed.seo.services import organization_jsonld
+        # Nothing configured → returns None.
+        self.assertIsNone(organization_jsonld())
+
+    def test_organization_jsonld_with_settings(self):
+        from plugins.installed.seo.models import SiteSeoSettings
+        from plugins.installed.seo.services import organization_jsonld
+
+        SiteSeoSettings.objects.create(
+            organization_name='Acme Books',
+            organization_logo_url='https://example.com/logo.png',
+            facebook_url='https://facebook.com/acme',
+        )
+        obj = organization_jsonld()
+        self.assertIsNotNone(obj)
+        self.assertEqual(obj['@type'], 'Organization')
+        self.assertEqual(obj['name'], 'Acme Books')
+        self.assertIn('https://facebook.com/acme', obj['sameAs'])
+
+    def test_404_log_records_and_dedupes(self):
+        from plugins.installed.seo.models import NotFoundLog
+        from plugins.installed.seo.services import record_404
+        record_404(path='/missing/', referrer='https://example.com/')
+        record_404(path='/missing/')
+        record_404(path='/missing/')
+        log = NotFoundLog.objects.get(path='/missing/')
+        self.assertEqual(log.hit_count, 3)
+
+    def test_audit_product_low_score_when_empty(self):
+        from decimal import Decimal
+        from djmoney.money import Money
+        from plugins.installed.catalog.models import Product
+        from plugins.installed.seo.services import audit_product
+
+        p = Product.objects.create(
+            name='X', slug='product-bad', sku='X1',
+            price=Money(Decimal('10'), 'USD'), status='active',
+        )
+        result = audit_product(p)
+        # Has weak slug + no description → score reduced
+        self.assertLess(result['score'], 100)
+        self.assertTrue(any(i['code'] == 'weak_slug' for i in result['issues']))
+
+
+class DeepSeoAgentToolsTests(TestCase):
+
+    def test_tools_registered(self):
+        from core.agents import agent_registry
+        names = {t.name for t in agent_registry.platform_tools()}
+        for required in ('seo.audit_product', 'seo.audit_all', 'seo.list_404s',
+                         'seo.create_redirect', 'seo.bulk_set_meta',
+                         'seo.set_site_settings'):
+            self.assertIn(required, names)
