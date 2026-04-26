@@ -1,0 +1,11 @@
+from django.urls import path
+
+from plugins.installed.analytics import views
+
+app_name = 'analytics_dash'
+
+urlpatterns = [
+    path('', views.overview, name='overview'),
+    path('realtime/', views.realtime, name='realtime'),
+    path('funnel/', views.funnel_view, name='funnel'),
+]

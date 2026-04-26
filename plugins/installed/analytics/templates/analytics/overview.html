@@ -1,0 +1,82 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Analytics overview · Morpheus{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-semibold">Analytics — last {{ days }} days</h1>
+  <form method="get" style="display:inline-flex; gap:.5rem;">
+    <select name="days" class="input" style="max-width:120px;" onchange="this.form.submit()">
+      <option value="1" {% if days == 1 %}selected{% endif %}>Today</option>
+      <option value="7" {% if days == 7 %}selected{% endif %}>7 days</option>
+      <option value="30" {% if days == 30 %}selected{% endif %}>30 days</option>
+      <option value="90" {% if days == 90 %}selected{% endif %}>90 days</option>
+    </select>
+  </form>
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Sessions</p>
+    <p class="text-2xl font-semibold mt-1">{{ summary.sessions }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Pageviews</p>
+    <p class="text-2xl font-semibold mt-1">{{ summary.pageviews }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Orders</p>
+    <p class="text-2xl font-semibold mt-1">{{ summary.orders }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Revenue</p>
+    <p class="text-2xl font-semibold mt-1">{% if summary.revenue %}{{ summary.revenue }}{% else %}—{% endif %}</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Product views</p>
+    <p class="text-xl font-semibold mt-1">{{ summary.product_views }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Cart adds</p>
+    <p class="text-xl font-semibold mt-1">{{ summary.cart_adds }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Checkouts started</p>
+    <p class="text-xl font-semibold mt-1">{{ summary.checkouts_started }}</p>
+  </div>
+  <div class="card card-padded">
+    <p class="text-xs uppercase tracking-wide text-[color:var(--text-muted)]">Searches</p>
+    <p class="text-xl font-semibold mt-1">{{ summary.searches }}</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+  <div class="card card-padded">
+    <h3 class="font-semibold mb-3">Top products</h3>
+    {% for r in top_products %}
+    <div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);">
+      <span>{{ r.product_slug }}</span><strong>{{ r.views }}</strong>
+    </div>
+    {% empty %}<p class="text-sm text-[color:var(--text-muted)]">No data yet.</p>{% endfor %}
+  </div>
+  <div class="card card-padded">
+    <h3 class="font-semibold mb-3">Top searches</h3>
+    {% for r in top_searches %}
+    <div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);">
+      <span>{{ r.query }}</span><strong>{{ r.count }}</strong>
+    </div>
+    {% empty %}<p class="text-sm text-[color:var(--text-muted)]">No searches yet.</p>{% endfor %}
+  </div>
+</div>
+
+<div class="card card-padded">
+  <h3 class="font-semibold mb-3">AI agent activity</h3>
+  {% for r in agent_activity %}
+  <div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);">
+    <span>{{ r.agent_name }}</span><strong>{{ r.runs }} runs</strong>
+  </div>
+  {% empty %}<p class="text-sm text-[color:var(--text-muted)]">No agent runs in this window.</p>{% endfor %}
+</div>
+{% endblock %}

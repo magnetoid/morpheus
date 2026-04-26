@@ -1,0 +1,25 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Funnel · Morpheus{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-2">Funnel</h1>
+<p class="text-sm text-[color:var(--text-muted)] mb-4">Last {{ days }} days · steps: <code>{{ steps|join:" → " }}</code></p>
+
+<div class="card">
+  <table class="morph-table">
+    <thead><tr><th>Step</th><th>Sessions</th><th>Conversion</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr>
+      <td><code>{{ r.step }}</code></td>
+      <td>{{ r.sessions }}</td>
+      <td>{{ r.pct }}%</td>
+      <td><div style="background:var(--surface-2); height:8px; width:200px; border-radius:4px; overflow:hidden;">
+        <div style="background:var(--primary); height:100%; width:{{ r.pct }}%;"></div>
+      </div></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
