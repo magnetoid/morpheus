@@ -48,20 +48,43 @@ def capabilities_for(user, *, channel=None) -> set[str]:
 
 def grant(user, role_slug: str, *, channel=None, granted_by=None) -> 'RoleBinding | None':  # noqa: F821
     from plugins.installed.rbac.models import Role, RoleBinding
+    from core.audit import record
     role = Role.objects.filter(slug=role_slug).first()
     if not role:
         logger.warning('rbac: unknown role %s', role_slug)
         return None
-    binding, _ = RoleBinding.objects.get_or_create(
+    binding, created = RoleBinding.objects.get_or_create(
         user=user, role=role, channel=channel,
         defaults={'granted_by': granted_by},
     )
+    if created:
+        record(
+            event_type='rbac.role_granted',
+            actor=granted_by,
+            target=f'user/{user.pk}',
+            metadata={
+                'role': role_slug,
+                'channel': getattr(channel, 'slug', None) or str(channel) if channel else None,
+            },
+        )
     return binding
 
 
-def revoke(user, role_slug: str, *, channel=None) -> int:
+def revoke(user, role_slug: str, *, channel=None, revoked_by=None) -> int:
     from plugins.installed.rbac.models import RoleBinding
+    from core.audit import record
     n, _ = RoleBinding.objects.filter(
         user=user, role__slug=role_slug, channel=channel,
     ).delete()
+    if n:
+        record(
+            event_type='rbac.role_revoked',
+            actor=revoked_by,
+            target=f'user/{user.pk}',
+            metadata={
+                'role': role_slug,
+                'channel': getattr(channel, 'slug', None) or str(channel) if channel else None,
+                'count': n,
+            },
+        )
     return n

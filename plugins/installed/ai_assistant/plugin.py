@@ -1,7 +1,14 @@
 """
-Morpheus CMS — AI Assistant Plugin Manifest
-The AI & Agent layer: Intent Engine, Memory, LLM Gateway, Semantic Search,
-Autonomous Operator, Dynamic Assembly, A2A Commerce, Zero-Shot Catalog.
+Morpheus CMS — AI Signals plugin (formerly AI Assistant).
+
+Scope today: AI **signals** — embeddings, semantic search,
+recommendations, dynamic pricing. The agent layer (chat, tools, runs,
+background scheduling, approvals) lives in `core.agents` +
+`agent_core` plugin. New agent work belongs there, not here.
+
+This plugin still owns the storefront-side hooks that produce signals
+the agent layer consumes (embedding refresh on product create/update,
+view recording, search logging).
 """
 from plugins.base import MorpheusPlugin
 from core.hooks import MorpheusEvents
@@ -9,12 +16,12 @@ from core.hooks import MorpheusEvents
 
 class AIAssistantPlugin(MorpheusPlugin):
     name = "ai_assistant"
-    label = "AI Assistant & Agent Commerce"
-    version = "1.0.0"
+    label = "AI Signals (embeddings, search, pricing)"
+    version = "2.0.0"
     description = (
-        "Full AI-first commerce layer: intent resolution, agent memory, "
-        "semantic search, autonomous store operator, A2A commerce, "
-        "zero-shot catalog, and synthetic customer testing."
+        "AI signals layer: product embeddings, semantic search, "
+        "recommendations, dynamic pricing. The agent runtime now lives in "
+        "core.agents + agent_core — see the Agents dashboard."
     )
     has_models = True
     requires = ["catalog", "orders", "customers"]
