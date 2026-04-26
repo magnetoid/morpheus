@@ -51,17 +51,77 @@ class StoreSettings(models.Model):
 
 class StoreChannel(models.Model):
     """
-    Enables headless multi-tenancy. A single Morpheus backend can serve 
-    multiple storefronts (e.g., B2B wholesale portal, B2C main site, App channel).
+    A storefront channel. One Morpheus backend serves N channels — different
+    domains, currencies, default countries, allowed payment methods, and
+    per-channel product pricing/availability via `ProductChannelListing`.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    slug = models.SlugField(max_length=80, unique=True, db_index=True, default='default')
     name = models.CharField(max_length=100)
     domain = models.CharField(max_length=200, unique=True)
+    currency = models.CharField(max_length=3, default='USD',
+                                help_text='ISO 4217 currency code; prices use this.')
+    default_country = models.CharField(max_length=2, default='US',
+                                       help_text='ISO 3166-1 alpha-2; used for tax/shipping defaults.')
+    country_codes = models.JSONField(
+        default=list, blank=True,
+        help_text='Optional list of ISO countries this channel serves (empty = global).',
+    )
+    is_default = models.BooleanField(default=False, db_index=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['-is_default', 'name']
+
     def __str__(self):
-        return f"{self.name} ({self.domain})"
+        return f'{self.name} ({self.domain} · {self.currency})'
+
+    @classmethod
+    def resolve_for_request(cls, request) -> 'StoreChannel | None':
+        """Pick the best channel for `request` — by host, else default, else first."""
+        if request is None:
+            return cls.objects.filter(is_default=True).first() or cls.objects.first()
+        host = (request.get_host() if hasattr(request, 'get_host') else '').split(':')[0]
+        if host:
+            row = cls.objects.filter(domain=host, is_active=True).first()
+            if row:
+                return row
+        return cls.objects.filter(is_default=True).first() or cls.objects.first()
+
+
+class ProductChannelListing(models.Model):
+    """Per-channel pricing + visibility for a Product.
+
+    Falls back to `Product.price` when no listing exists for that channel.
+    Generic FK so we don't introduce a hard dep from core onto catalog.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    channel = models.ForeignKey(StoreChannel, on_delete=models.CASCADE, related_name='product_listings')
+    # We don't import catalog.Product here — keep core decoupled.
+    product_ct = models.ForeignKey(
+        'contenttypes.ContentType', on_delete=models.CASCADE,
+        limit_choices_to={'app_label': 'catalog', 'model': 'product'},
+    )
+    product_id = models.CharField(max_length=64, db_index=True)
+    # MoneyField from djmoney would mean importing here; keep numeric for now.
+    price_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    cost_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    is_published = models.BooleanField(default=True, db_index=True)
+    visible_in_listings = models.BooleanField(default=True)
+    available_for_purchase = models.BooleanField(default=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('channel', 'product_ct', 'product_id')
+        indexes = [
+            models.Index(fields=['channel', 'is_published']),
+            models.Index(fields=['product_ct', 'product_id']),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.channel.slug}/{self.product_id} {self.price_amount}'
 
 class APIKey(models.Model):
     """
