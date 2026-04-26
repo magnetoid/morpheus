@@ -37,6 +37,11 @@
         <p style="font-family: var(--serif); font-size: 1.5rem; font-weight: 600;">{{ order.total }}</p>
       </div>
     </div>
+
+    <div style="margin-top: 2rem; display:flex; gap: .75rem;">
+      <a href="/account/orders/{{ order.order_number }}/return/" class="btn btn-ghost">Request a return</a>
+      <a href="/account/orders/" class="btn-link">All orders</a>
+    </div>
   </div>
 </section>
 {% endblock %}
