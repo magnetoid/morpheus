@@ -1,0 +1,88 @@
+{# Floating Assistant chat widget — included by admin_dashboard/base.html. #}
+{% load static %}
+<div id="morph-assistant" style="position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 9000; font-family: 'Inter', system-ui, sans-serif;">
+  <button id="morph-assistant-toggle" type="button" aria-label="Open Assistant" style="
+      border: none; background: var(--primary, #1a1a1a); color: var(--primary-fg, #fff);
+      border-radius: 999px; padding: .75rem 1.1rem; font-size: .85rem; font-weight: 500;
+      box-shadow: 0 8px 24px rgba(0,0,0,.18); cursor: pointer; display: inline-flex;
+      align-items: center; gap: .5rem;">
+    <i data-lucide="sparkles" style="width:14px;height:14px;"></i> Assistant
+  </button>
+  <div id="morph-assistant-panel" style="
+      display: none; position: absolute; right: 0; bottom: 3.5rem;
+      width: 380px; max-width: calc(100vw - 2.5rem); height: 540px; max-height: calc(100vh - 5rem);
+      background: var(--surface, #fff); border: 1px solid var(--border, #e3e3e3);
+      border-radius: 12px; box-shadow: 0 24px 48px rgba(0,0,0,.18);
+      flex-direction: column; overflow: hidden;">
+    <div style="padding: .75rem 1rem; border-bottom: 1px solid var(--border, #e3e3e3); display: flex; justify-content: space-between; align-items: center;">
+      <strong style="font-size: .9rem;">Assistant</strong>
+      <div style="display:flex; gap:.5rem;">
+        <a href="/admin/assistant/" style="font-size:.75rem; color:var(--text-muted, #6b7280); text-decoration:underline;">Open full</a>
+        <button id="morph-assistant-close" type="button" aria-label="Close" style="border:none;background:transparent;cursor:pointer;font-size:1.1rem;color:var(--text-muted,#6b7280);">×</button>
+      </div>
+    </div>
+    <div id="morph-assistant-log" style="flex:1; padding: .75rem; overflow-y:auto; font-size:.85rem;"></div>
+    <form id="morph-assistant-form" style="display:flex; gap:.5rem; padding: .65rem; border-top: 1px solid var(--border, #e3e3e3);">
+      <input type="text" name="message" placeholder="Ask the Assistant…"
+        autocomplete="off" required style="flex:1; padding:.5rem .75rem; border: 1px solid var(--border, #e3e3e3); border-radius: 6px; font-size:.85rem;">
+      <button type="submit" style="border:none; background: var(--primary, #1a1a1a); color: var(--primary-fg, #fff); border-radius: 6px; padding:.5rem .85rem; font-size:.85rem; cursor:pointer;">Send</button>
+    </form>
+  </div>
+</div>
+<script>
+(() => {
+  const toggle = document.getElementById('morph-assistant-toggle');
+  const panel = document.getElementById('morph-assistant-panel');
+  const closeBtn = document.getElementById('morph-assistant-close');
+  const form = document.getElementById('morph-assistant-form');
+  const log = document.getElementById('morph-assistant-log');
+  const getCsrf = () => (document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                        || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '');
+
+  function pushLine(role, text, toolName) {
+    const div = document.createElement('div');
+    const isUser = role === 'user';
+    const isTool = role === 'tool';
+    div.style.cssText = `margin: .4rem 0; padding: .55rem .65rem; border-radius: 8px;
+      background: ${isUser ? 'var(--surface-2,#fafafa)' : isTool ? 'rgba(0,150,255,0.06)' : 'var(--surface,#fff)'};
+      border: ${isUser ? 'none' : '1px solid var(--border,#e3e3e3)'}; font-size: .85rem;`;
+    const label = isTool ? `🔧 ${toolName || 'tool'}` : isUser ? 'You' : 'Assistant';
+    div.innerHTML = `<strong style="font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted,#6b7280);">${label}</strong>
+      <div style="margin-top:.2rem;white-space:pre-wrap;">${text.replace(/[<>&]/g, m => ({'<':'&lt;','>':'&gt;','&':'&amp;'})[m])}</div>`;
+    log.appendChild(div); log.scrollTop = log.scrollHeight;
+  }
+
+  function loadHistory() {
+    fetch('/admin/assistant/history/').then(r => r.json()).then(data => {
+      log.innerHTML = '';
+      (data.messages || []).forEach(m => pushLine(m.role, m.content, m.tool_name));
+    }).catch(() => {});
+  }
+
+  toggle.addEventListener('click', () => {
+    if (panel.style.display === 'flex') { panel.style.display = 'none'; return; }
+    panel.style.display = 'flex'; loadHistory();
+  });
+  closeBtn.addEventListener('click', () => { panel.style.display = 'none'; });
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const input = form.querySelector('input[name=message]');
+    const text = (input.value || '').trim();
+    if (!text) return;
+    pushLine('user', text); input.value = '';
+    const thinking = document.createElement('div');
+    thinking.style.cssText = 'margin:.4rem 0; color:var(--text-muted,#6b7280); font-style:italic; font-size:.85rem;';
+    thinking.textContent = '…';
+    log.appendChild(thinking);
+    fetch('/admin/assistant/invoke/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrf()},
+      body: JSON.stringify({message: text}),
+    })
+    .then(r => r.json())
+    .then(data => { thinking.remove(); pushLine('assistant', data.text || data.error || '(no reply)'); })
+    .catch(() => { thinking.remove(); pushLine('assistant', 'connection error'); });
+  });
+})();
+</script>

@@ -4,7 +4,39 @@ All notable changes to Morpheus. Loose [Keep a Changelog](https://keepachangelog
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Hard-coded Morpheus Assistant in core** ([`core/assistant/`](core/assistant/)) —
+  a single, always-available operator that survives plugin failure, has
+  system-level tools (filesystem read, DB introspection, log search,
+  plugin status, server info, git log), and delegates to specialised
+  agents via `delegate.invoke_agent`. Mounted at `/admin/assistant/`
+  outside the plugin layer. Persistence falls back to JSONL on disk
+  when the DB is down so the chat is never unreachable. Floating chat
+  widget included by default in every admin page.
+- **Unified Settings hub** at `/dashboard/settings/` — sliding-panel
+  layout with platform sections (Store / AI / Theme) plus every plugin's
+  contributed `SettingsPanel` (Stripe, Cloudflare, SEO, CRM, Tax,
+  Shipping, etc.) — each plugin owns its own page.
+- **Phase 3 commerce plugins** (PR #29): `gift_cards`, `b2b`
+  (quotes / per-account price lists / Net 15-90 terms), `subscriptions`
+  (Plan + Subscription + invoice; Stripe Billing adapter slot).
+- **Multi-currency display**: `core.ExchangeRate` model + display
+  currency context processor + `{{ price|convert:DISPLAY_CURRENCY }}`
+  template filter.
+- **Search facets**: storefront `product_list` now filters by category,
+  tag, price range, and sort.
+- **Phase 2 ops bundle** (PR #28): `webhooks_ui` plugin with delivery log
+  + retry/replay; `inventory.notify_back_in_stock` task + model;
+  `inventory.apply_price_schedules` beat task + `catalog.PriceSchedule`
+  model; `inventory.find_abandoned_carts` beat task; cart-recovery email
+  task in marketing (idempotent stamp on `cart.metadata`).
+
+### Changed
+
+- **30 plugins** active by default (was 27).
+- README + ARCHITECTURE rewritten to surface the Core/Assistant + agent
+  kernel + plugin layering distinction.
 
 ---
 

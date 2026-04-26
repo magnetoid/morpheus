@@ -102,6 +102,7 @@ THIRD_PARTY_APPS = [
 # Engine apps (no business logic — just infrastructure)
 MORPHEUS_ENGINE_APPS = [
     'core',
+    'core.assistant',  # The hard-coded Morpheus Assistant — peer of plugins, lives in core
     'plugins',
     'themes',
     'api',

@@ -2,29 +2,143 @@
 {% block title %}Settings · Morpheus{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto space-y-4">
-  <div>
-    <h1 class="text-xl font-semibold tracking-tight">Settings</h1>
-    <p class="text-sm text-[color:var(--text-muted)]">Read-only summary of the active configuration.</p>
-  </div>
+<div class="settings-shell">
 
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-    {% for s in sections %}
-    <div class="card card-padded">
-      <div class="flex items-center gap-2">
-        <i data-lucide="{{ s.icon }}" class="h-4 w-4 text-[color:var(--text-muted)]"></i>
-        <h3 class="font-semibold">{{ s.title }}</h3>
+  {# ── Left rail: top-level settings menu ─────────────────────────────────── #}
+  <aside id="settings-rail" class="settings-rail">
+    <div class="settings-rail-head">
+      <span class="settings-rail-title">Settings</span>
+    </div>
+
+    <div class="settings-rail-section">
+      <p class="settings-rail-section-label">Platform</p>
+      {% for s in core_sections %}
+      <a href="#" class="settings-rail-item" data-pane="core-{{ s.key }}">
+        <i data-lucide="{{ s.icon }}" class="h-4 w-4"></i>
+        <span>{{ s.label }}</span>
+      </a>
+      {% endfor %}
+    </div>
+
+    <div class="settings-rail-section">
+      <p class="settings-rail-section-label">Plugins</p>
+      {% for p in plugin_panels %}
+      <a href="#" class="settings-rail-item" data-pane="plugin-{{ p.plugin }}" data-href="{{ p.url }}">
+        <i data-lucide="{{ p.icon }}" class="h-4 w-4"></i>
+        <span>{{ p.label }}</span>
+      </a>
+      {% empty %}
+      <p class="settings-rail-empty">No plugin settings panels yet.</p>
+      {% endfor %}
+    </div>
+  </aside>
+
+  {# ── Right pane: details ────────────────────────────────────────────────── #}
+  <main class="settings-pane">
+    <div class="settings-pane-head">
+      <button id="settings-back" type="button" class="settings-back" aria-label="Back" style="display: none;">
+        <i data-lucide="chevron-left" class="h-4 w-4"></i> Back
+      </button>
+      <h1 id="settings-pane-title" class="text-xl font-semibold tracking-tight">Settings</h1>
+    </div>
+
+    <div id="settings-pane-default" class="settings-pane-body">
+      <p class="text-sm text-[color:var(--text-muted)]">
+        Pick an item from the left to view or edit. Plugin pages open inline;
+        each plugin owns its own settings page.
+      </p>
+    </div>
+
+    {% for s in core_sections %}
+    <div class="settings-pane-body settings-pane-detail" id="pane-core-{{ s.key }}" hidden>
+      <p class="text-sm text-[color:var(--text-muted)] mb-4">{{ s.description }}</p>
+      <div class="card">
+        <dl class="divide-y divide-[color:var(--border)]">
+          {% for k, v in s.items %}
+          <div class="flex items-center justify-between px-5 py-3">
+            <dt class="text-sm text-[color:var(--text-muted)]">{{ k }}</dt>
+            <dd class="text-sm font-medium">{{ v }}</dd>
+          </div>
+          {% endfor %}
+        </dl>
       </div>
-      <dl class="mt-3 divide-y divide-[color:var(--border)]">
-        {% for k, v in s.items %}
-        <div class="flex items-center justify-between py-2">
-          <dt class="text-sm text-[color:var(--text-muted)]">{{ k }}</dt>
-          <dd class="text-sm font-medium">{{ v }}</dd>
-        </div>
-        {% endfor %}
-      </dl>
     </div>
     {% endfor %}
-  </div>
+
+    {% for p in plugin_panels %}
+    <div class="settings-pane-body settings-pane-detail" id="pane-plugin-{{ p.plugin }}" hidden data-load-url="{{ p.url }}">
+      <p class="text-sm text-[color:var(--text-muted)] mb-4">{{ p.description }}</p>
+      <div class="card card-padded">
+        <p class="text-sm">
+          Open the full settings page for <strong>{{ p.label }}</strong>:
+          <a href="{{ p.url }}" class="btn-link">Open</a>
+        </p>
+      </div>
+    </div>
+    {% endfor %}
+  </main>
 </div>
+
+<style>
+  .settings-shell { display: grid; grid-template-columns: 260px 1fr; gap: 1rem; min-height: 70vh; }
+  @media (max-width: 768px) { .settings-shell { grid-template-columns: 1fr; } }
+  .settings-rail { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: .5rem; height: fit-content; }
+  .settings-rail-head { padding: .5rem .75rem .75rem; border-bottom: 1px solid var(--border); margin-bottom: .5rem; }
+  .settings-rail-title { font-weight: 600; font-size: .9rem; }
+  .settings-rail-section { margin-top: .5rem; }
+  .settings-rail-section-label { padding: .5rem .65rem .25rem; font-size: .65rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+  .settings-rail-empty { padding: .5rem .65rem; font-size: .8rem; color: var(--text-muted); }
+  .settings-rail-item { display: flex; align-items: center; gap: .55rem; padding: .5rem .65rem; border-radius: 6px; color: var(--text); font-size: .875rem; cursor: pointer; }
+  .settings-rail-item:hover { background: var(--surface-2); }
+  .settings-rail-item.active { background: rgba(0,0,0,.07); font-weight: 500; }
+  .settings-pane { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
+  .settings-pane-head { display: flex; align-items: center; gap: .75rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1.25rem; }
+  .settings-back { display: inline-flex; align-items: center; gap: .35rem; padding: .35rem .65rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); cursor: pointer; font-size: .8rem; }
+</style>
+
+<script>
+(() => {
+  const items = document.querySelectorAll('.settings-rail-item');
+  const detailPanes = document.querySelectorAll('.settings-pane-detail');
+  const defaultPane = document.getElementById('settings-pane-default');
+  const title = document.getElementById('settings-pane-title');
+  const back = document.getElementById('settings-back');
+
+  function showPane(key) {
+    detailPanes.forEach(p => p.hidden = true);
+    defaultPane.hidden = true;
+    const target = document.getElementById('pane-' + key);
+    if (target) {
+      target.hidden = false;
+      const item = document.querySelector(`[data-pane="${key}"]`);
+      if (item) {
+        title.textContent = item.querySelector('span').textContent;
+        items.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        back.style.display = 'inline-flex';
+      }
+    }
+  }
+
+  function showDefault() {
+    detailPanes.forEach(p => p.hidden = true);
+    defaultPane.hidden = false;
+    title.textContent = 'Settings';
+    items.forEach(i => i.classList.remove('active'));
+    back.style.display = 'none';
+  }
+
+  items.forEach(item => {
+    item.addEventListener('click', e => {
+      e.preventDefault();
+      showPane(item.dataset.pane);
+    });
+  });
+  back.addEventListener('click', showDefault);
+
+  // Deep-link via hash: #pane=plugin-stripe
+  const m = (location.hash || '').match(/pane=([\w-]+)/);
+  if (m) showPane(m[1]);
+})();
+</script>
 {% endblock %}

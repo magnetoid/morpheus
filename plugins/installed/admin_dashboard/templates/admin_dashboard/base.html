@@ -85,7 +85,8 @@
     <a href="{% url 'admin_dashboard:marketing' %}" class="nav-link {% if active_nav == 'marketing' %}active{% endif %}"><i data-lucide="megaphone" class="h-4 w-4"></i> Marketing</a>
     <a href="{% url 'admin_dashboard:analytics' %}" class="nav-link {% if active_nav == 'analytics' %}active{% endif %}"><i data-lucide="bar-chart-2" class="h-4 w-4"></i> Analytics</a>
     <div class="nav-section">AI &amp; agents</div>
-    <a href="{% url 'admin_dashboard:ai_insights' %}" class="nav-link {% if active_nav == 'ai_insights' %}active{% endif %}"><i data-lucide="sparkles" class="h-4 w-4"></i> Insights</a>
+    <a href="/admin/assistant/" class="nav-link {% if active_nav == 'assistant' %}active{% endif %}"><i data-lucide="sparkles" class="h-4 w-4"></i> Assistant</a>
+    <a href="{% url 'admin_dashboard:ai_insights' %}" class="nav-link {% if active_nav == 'ai_insights' %}active{% endif %}"><i data-lucide="bar-chart" class="h-4 w-4"></i> Insights</a>
     <div class="nav-section">Sales channels</div>
     <a href="#" class="nav-link"><i data-lucide="globe" class="h-4 w-4"></i> Online store</a>
     {% if dashboard_pages %}
@@ -141,5 +142,7 @@
     bd.addEventListener('click', close);
   })();
 </script>
+{# The hard-coded Morpheus Assistant — always present in admin. #}
+{% include "assistant/_floating_widget.html" %}
 </body>
 </html>
