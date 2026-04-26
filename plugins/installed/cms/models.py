@@ -1,0 +1,176 @@
+"""CMS models — pages, blocks, menus, forms.
+
+Closes the "ecommerce + CMS = platform" gap. Themes render content via
+the resolver:
+
+    /<slug>/        → Page resolver (about, manifesto, returns, etc.)
+    {% cms_menu key %}  → render a Menu by key into the storefront nav
+    {% cms_block key %} → render a named Block (callouts, banners) anywhere
+
+Pages support draft / scheduled / published states + per-page SEO via
+the existing seo plugin's SeoMeta generic FK.
+"""
+from __future__ import annotations
+
+import uuid
+
+from django.conf import settings
+from django.db import models
+
+
+class Page(models.Model):
+    """A merchant-editable static page rendered by the storefront."""
+
+    STATE_CHOICES = [
+        ('draft', 'Draft'),
+        ('scheduled', 'Scheduled'),
+        ('published', 'Published'),
+        ('archived', 'Archived'),
+    ]
+    LAYOUT_CHOICES = [
+        ('default', 'Default — single column'),
+        ('long_form', 'Long form'),
+        ('landing', 'Landing'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    slug = models.SlugField(max_length=200, unique=True, db_index=True)
+    title = models.CharField(max_length=200)
+    excerpt = models.CharField(max_length=300, blank=True)
+    body = models.TextField(blank=True, help_text='Markdown or HTML — theme decides.')
+
+    layout = models.CharField(max_length=20, choices=LAYOUT_CHOICES, default='default')
+    state = models.CharField(max_length=12, choices=STATE_CHOICES, default='draft', db_index=True)
+    publish_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL, null=True, blank=True, related_name='cms_pages',
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self) -> str:
+        return f'{self.title} ({self.state})'
+
+    @property
+    def is_live(self) -> bool:
+        from django.utils import timezone
+        if self.state != 'published':
+            return False
+        if self.publish_at and self.publish_at > timezone.now():
+            return False
+        return True
+
+
+class Block(models.Model):
+    """Named, reusable content snippet (banner, callout, hero, etc.)."""
+
+    KIND_CHOICES = [
+        ('html', 'HTML / Markdown'),
+        ('image', 'Image with caption'),
+        ('callout', 'Callout / banner'),
+        ('cta', 'Call-to-action'),
+        ('embed', 'Embed (script / iframe)'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    key = models.SlugField(max_length=120, unique=True, db_index=True,
+                           help_text='Stable key — themes reference this.')
+    label = models.CharField(max_length=200, help_text='Human-readable name.')
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default='html')
+    body = models.TextField(blank=True)
+    image_url = models.URLField(max_length=600, blank=True)
+    cta_label = models.CharField(max_length=100, blank=True)
+    cta_url = models.CharField(max_length=500, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['key']
+
+    def __str__(self) -> str:
+        return f'{self.label} ({self.key})'
+
+
+class Menu(models.Model):
+    """Named navigation menu (header, footer, mobile)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    key = models.SlugField(max_length=80, unique=True, db_index=True)
+    label = models.CharField(max_length=120)
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['key']
+
+    def __str__(self) -> str:
+        return self.label
+
+
+class MenuItem(models.Model):
+    """One link within a Menu."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    menu = models.ForeignKey(Menu, on_delete=models.CASCADE, related_name='items')
+    label = models.CharField(max_length=120)
+    url = models.CharField(max_length=500)
+    target = models.CharField(max_length=10, default='_self', blank=True)
+    parent = models.ForeignKey(
+        'self', on_delete=models.CASCADE, null=True, blank=True, related_name='children',
+    )
+    order = models.PositiveSmallIntegerField(default=100)
+    icon = models.CharField(max_length=60, blank=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+
+class Form(models.Model):
+    """A merchant-defined form (contact, newsletter, lead-gen).
+
+    Fields are described by a JSON schema-like list:
+        [{"name": "email", "type": "email", "required": true, "label": "Email"}]
+
+    Submissions persist as `FormSubmission` rows — also fan out to CRM
+    as a Lead + Interaction (the cms plugin's hook on form_submitted).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    key = models.SlugField(max_length=80, unique=True, db_index=True)
+    label = models.CharField(max_length=200)
+    fields = models.JSONField(default=list)
+    submit_label = models.CharField(max_length=80, default='Send')
+    success_message = models.CharField(max_length=300, default='Thanks — we got your note.')
+    notify_email = models.EmailField(blank=True, help_text='Optional address that receives a copy of every submission.')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['key']
+
+    def __str__(self) -> str:
+        return self.label
+
+
+class FormSubmission(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    form = models.ForeignKey(Form, on_delete=models.CASCADE, related_name='submissions')
+    payload = models.JSONField(default=dict)
+    submitter_email = models.EmailField(blank=True, db_index=True)
+    submitter_ip_hash = models.CharField(max_length=64, blank=True)
+    user_agent = models.CharField(max_length=300, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['form', '-created_at'])]

@@ -1,0 +1,13 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}CMS pages{% endblock %}
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">Pages</h1>
+<div class="card"><table class="morph-table">
+<thead><tr><th>Slug</th><th>Title</th><th>State</th><th>Updated</th></tr></thead>
+<tbody>{% for r in rows %}
+<tr><td><a href="/p/{{ r.slug }}/" target="_blank"><code>/p/{{ r.slug }}/</code></a></td>
+<td>{{ r.title }}</td><td><span class="pill {% if r.state == 'published' %}pill-success{% else %}pill-neutral{% endif %}">{{ r.state }}</span></td>
+<td>{{ r.updated_at|date:"M j" }}</td></tr>
+{% empty %}<tr><td colspan="4" style="text-align:center;padding:2rem;color:var(--text-muted);">No pages yet — create via Django admin or the agent.</td></tr>
+{% endfor %}</tbody></table></div>
+{% endblock %}

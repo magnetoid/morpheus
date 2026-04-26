@@ -67,6 +67,7 @@ MORPHEUS_DEFAULT_PLUGINS = [
     'plugins.installed.gift_cards',
     'plugins.installed.b2b',
     'plugins.installed.subscriptions',
+    'plugins.installed.cms',
 ]
 
 # ── Extra plugins installed by merchant via .env ───────────────────────────────

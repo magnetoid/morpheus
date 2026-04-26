@@ -1,0 +1,14 @@
+{% extends "storefront/base.html" %}
+{% block title %}{{ page.title }}{% endblock %}
+
+{% block content %}
+<article style="padding: 4rem 0 5rem;">
+  <div class="wrap" style="max-width: 720px;">
+    {% if page.excerpt %}<p class="eyebrow">{{ page.excerpt }}</p>{% endif %}
+    <h1 class="display display-xl" style="margin: 1.5rem 0 2rem;">{{ page.title }}</h1>
+    <div style="font-size: 1.05rem; line-height: 1.7; color: var(--ink-2);">
+      {{ page.body|safe }}
+    </div>
+  </div>
+</article>
+{% endblock %}
