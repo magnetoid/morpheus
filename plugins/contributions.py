@@ -50,6 +50,15 @@ class DashboardPage:
     `view` is a callable that takes a request and returns an HttpResponse,
     OR a dotted path string ("plugins.installed.<plugin>.views.my_view")
     so the registry can resolve it lazily without import-time side effects.
+
+    `nav` controls which sidebar lists the entry:
+      * 'main'     — daily-use page in the main sidebar (default)
+      * 'settings' — admin/setup page that lives in the settings panel
+                     alongside the schema-driven SettingsPanel forms
+
+    Routes are unchanged regardless of `nav`; only the sidebar listing
+    moves. This mirrors Shopify — Orders/Products/Customers on the main
+    rail; Webhooks/Roles/CSV import in the settings panel.
     """
     label: str
     slug: str               # the URL slug, mounted under /dashboard/apps/<plugin>/<slug>/
@@ -58,6 +67,7 @@ class DashboardPage:
     section: str = 'plugins'  # 'plugins' | 'sales' | 'apps' | 'settings'
     order: int = 100
     plugin: str = ''
+    nav: str = 'main'       # 'main' | 'settings'
 
 
 @dataclass(slots=True)

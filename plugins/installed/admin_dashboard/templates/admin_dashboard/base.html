@@ -141,8 +141,18 @@
     <a href="{% url 'admin_dashboard:settings' %}#pane=core-theme" class="nav-link"><i data-lucide="palette" class="h-4 w-4"></i> Theme</a>
     <a href="{% url 'admin_dashboard:apps' %}" class="nav-link"><i data-lucide="grid-3x3" class="h-4 w-4"></i> Apps</a>
 
-    {# Every plugin's settings panel becomes its own entry here. #}
-    <div class="nav-section">Plugins</div>
+    {# Plugin pages explicitly tagged nav='settings' (admin/setup tools). #}
+    {% for section in settings_sections %}
+    <div class="nav-section">{{ section.label }}</div>
+    {% for page in section.pages %}
+    <a href="/dashboard/apps/{{ page.plugin }}/{{ page.slug }}/" class="nav-link">
+      <i data-lucide="{{ page.icon|default:'circle' }}" class="h-4 w-4"></i> {{ page.label }}
+    </a>
+    {% endfor %}
+    {% endfor %}
+
+    {# Schema-driven settings panels (form-based config: API keys, defaults). #}
+    <div class="nav-section">Plugin configuration</div>
     {% for entry in plugin_settings_panels %}
     <a href="/dashboard/apps/{{ entry.plugin }}/settings/" class="nav-link">
       <i data-lucide="settings" class="h-4 w-4"></i> {{ entry.panel.label }}

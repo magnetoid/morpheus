@@ -193,10 +193,23 @@ def orders_list(request: HttpRequest) -> HttpResponse:
         orders = list(qs[:100])
     except Exception:  # noqa: BLE001
         orders = []
+    # Drafts surface inside the Orders page rather than as a separate
+    # sidebar entry — staff sees drafts and real orders side by side.
+    draft_count = 0
+    drafts_url = ''
+    try:
+        from plugins.installed.draft_orders.models import DraftOrder
+        draft_count = DraftOrder.objects.exclude(status='converted').count()
+        drafts_url = '/dashboard/draft-orders/'
+    except Exception:  # noqa: BLE001 — draft_orders may be disabled
+        pass
+
     return render(request, 'admin_dashboard/orders.html', {
         'orders': orders,
         'status_filter': status_filter,
         'search': search,
+        'draft_count': draft_count,
+        'drafts_url': drafts_url,
         'active_nav': 'orders',
     })
 
