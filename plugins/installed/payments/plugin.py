@@ -15,9 +15,18 @@ class PaymentsPlugin(MorpheusPlugin):
     def ready(self):
         # Register hooks for order payment
         self.register_hook(MorpheusEvents.ORDER_PLACED, self.on_order_placed, priority=20)
-        
+
         # Register GraphQL extensions if we want mutations like `processPayment`
         self.register_graphql_extension('plugins.installed.payments.graphql.mutations')
+
+        try:
+            from plugins.installed.payments.gateway import gateway_registry
+            from plugins.installed.payments.gateways.manual_gateway import ManualGateway
+            from plugins.installed.payments.gateways.stripe_gateway import StripeGateway
+            gateway_registry.register(ManualGateway())
+            gateway_registry.register(StripeGateway())
+        except Exception as e:  # noqa: BLE001
+            logger.warning('payments: gateway registration failed: %s', e)
 
     def on_order_placed(self, order, **kwargs):
         """
