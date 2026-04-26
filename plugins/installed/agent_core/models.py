@@ -184,6 +184,56 @@ class AgentMemoryRecord(models.Model):
         ]
 
 
+class BackgroundAgent(models.Model):
+    """A registered agent that runs autonomously on a schedule.
+
+    The scheduler tick (every minute) finds all active rows whose
+    `next_run_at` <= now, dispatches a run, and computes the next slot.
+    """
+
+    STATE_ACTIVE = 'active'
+    STATE_PAUSED = 'paused'
+    STATE_ERROR = 'error'
+    STATE_CHOICES = [
+        (STATE_ACTIVE, 'Active'),
+        (STATE_PAUSED, 'Paused'),
+        (STATE_ERROR, 'Error'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=120, help_text='Human label for this background job.')
+    agent_name = models.CharField(max_length=100, db_index=True, help_text='Slug of the registered agent to run.')
+    prompt = models.TextField(help_text='User-message text passed to the agent on each tick.')
+    context_overrides = models.JSONField(default=dict, blank=True)
+
+    interval_seconds = models.PositiveIntegerField(default=3600)
+    state = models.CharField(max_length=12, choices=STATE_CHOICES, default=STATE_ACTIVE, db_index=True)
+
+    last_run_at = models.DateTimeField(null=True, blank=True)
+    next_run_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    last_run_id = models.CharField(max_length=64, blank=True)
+    last_error = models.TextField(blank=True)
+
+    consecutive_failures = models.PositiveIntegerField(default=0)
+    max_failures_before_pause = models.PositiveIntegerField(default=5)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='background_agents',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['state', 'next_run_at']),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.name} → {self.agent_name}'
+
+
 class AgentApprovalRequest(models.Model):
     """Pending approval gate for a tool that requires human sign-off."""
 

@@ -1,0 +1,81 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Background agents · Morpheus{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-semibold">Background agents</h1>
+  <a href="{% url 'agent_core_dash:runs' %}" class="btn-link">All runs →</a>
+</div>
+
+<p class="meta mb-4">
+  Schedule a registered agent to run on a fixed interval. The scheduler
+  fires every minute and will auto-pause an agent after repeated failures.
+</p>
+
+<div class="card mb-6">
+  <table class="morph-table">
+    <thead>
+      <tr>
+        <th>Name</th><th>Agent</th><th>Interval</th>
+        <th>State</th><th>Last run</th><th>Next run</th><th>Failures</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for bg in background_agents %}
+      <tr>
+        <td><strong>{{ bg.name }}</strong>{% if bg.last_error %}<br><span class="meta" title="{{ bg.last_error }}">⚠ last error</span>{% endif %}</td>
+        <td><code>{{ bg.agent_name }}</code></td>
+        <td>{{ bg.interval_seconds }}s</td>
+        <td>
+          {% if bg.state == 'active' %}<span class="pill pill-success">active</span>
+          {% elif bg.state == 'paused' %}<span class="pill">paused</span>
+          {% else %}<span class="pill pill-danger">{{ bg.state }}</span>{% endif %}
+        </td>
+        <td>{% if bg.last_run_at %}{{ bg.last_run_at|date:"M j H:i" }}{% else %}<span class="meta">—</span>{% endif %}</td>
+        <td>{% if bg.next_run_at %}{{ bg.next_run_at|date:"M j H:i" }}{% else %}<span class="meta">—</span>{% endif %}</td>
+        <td>{{ bg.consecutive_failures }} / {{ bg.max_failures_before_pause }}</td>
+        <td style="white-space:nowrap;">
+          <form method="post" action="/dashboard/agents/background/{{ bg.id }}/run-now/" style="display:inline">
+            {% csrf_token %}<button class="btn-link">Run now</button>
+          </form>
+          {% if bg.state == 'active' %}
+          <form method="post" action="/dashboard/agents/background/{{ bg.id }}/pause/" style="display:inline">
+            {% csrf_token %}<button class="btn-link">Pause</button>
+          </form>
+          {% else %}
+          <form method="post" action="/dashboard/agents/background/{{ bg.id }}/resume/" style="display:inline">
+            {% csrf_token %}<button class="btn-link">Resume</button>
+          </form>
+          {% endif %}
+          <form method="post" action="/dashboard/agents/background/{{ bg.id }}/delete/" style="display:inline" onsubmit="return confirm('Delete this background agent?');">
+            {% csrf_token %}<button class="btn-link" style="color:var(--danger);">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-muted);">
+        No background agents yet — create one below.
+      </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2 class="text-base font-semibold mb-2">Schedule a new background agent</h2>
+<div class="card card-padded">
+  <form method="post" style="display:grid;gap:0.75rem;">
+    {% csrf_token %}
+    <label>Name <input name="name" required class="form-input" placeholder="Daily low-stock digest"></label>
+    <label>Agent
+      <select name="agent_name" required class="form-input">
+        {% for a in agents %}<option value="{{ a.name }}">{{ a.label }} — {{ a.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Prompt
+      <textarea name="prompt" required class="form-input" rows="3" placeholder="Run a low-stock check and email me the items at or below reorder point."></textarea>
+    </label>
+    <label>Interval (seconds, min 60) <input name="interval_seconds" type="number" min="60" value="3600" class="form-input"></label>
+    <button type="submit" class="btn btn-primary">Schedule</button>
+  </form>
+</div>
+{% endblock %}

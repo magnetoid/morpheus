@@ -224,3 +224,59 @@ def merchant_ops_chat_view(request):
         'agent_name': 'merchant_ops',
         'active_nav': 'agents',
     })
+
+
+@staff_member_required
+def background_agents_view(request):
+    from django.shortcuts import redirect
+    from django.utils import timezone
+    from plugins.installed.agent_core.models import BackgroundAgent
+
+    if request.method == 'POST':
+        name = (request.POST.get('name') or '').strip()
+        agent_name = (request.POST.get('agent_name') or '').strip()
+        prompt = (request.POST.get('prompt') or '').strip()
+        try:
+            interval = max(60, int(request.POST.get('interval_seconds') or 3600))
+        except (TypeError, ValueError):
+            interval = 3600
+        if name and agent_name and prompt:
+            BackgroundAgent.objects.create(
+                name=name[:120], agent_name=agent_name[:100],
+                prompt=prompt[:50_000], interval_seconds=interval,
+                next_run_at=timezone.now(),
+                created_by=request.user if request.user.is_authenticated else None,
+            )
+        return redirect('/dashboard/agents/background/')
+
+    rows = BackgroundAgent.objects.all().order_by('-updated_at')[:200]
+    return render(request, 'agent_core/dashboard/background.html', {
+        'background_agents': rows,
+        'agents': agent_registry.all_agents(),
+        'active_nav': 'agents',
+    })
+
+
+@staff_member_required
+def background_agent_action_view(request, bg_id: str, action: str):
+    from django.shortcuts import redirect
+    from django.utils import timezone
+    from plugins.installed.agent_core.models import BackgroundAgent
+    from plugins.installed.agent_core.scheduler import fire
+
+    bg = get_object_or_404(BackgroundAgent, id=bg_id)
+    if request.method != 'POST':
+        return redirect('/dashboard/agents/background/')
+    if action == 'pause':
+        bg.state = BackgroundAgent.STATE_PAUSED
+        bg.save(update_fields=['state', 'updated_at'])
+    elif action == 'resume':
+        bg.state = BackgroundAgent.STATE_ACTIVE
+        bg.consecutive_failures = 0
+        bg.next_run_at = timezone.now()
+        bg.save(update_fields=['state', 'consecutive_failures', 'next_run_at', 'updated_at'])
+    elif action == 'run-now':
+        fire(bg)
+    elif action == 'delete':
+        bg.delete()
+    return redirect('/dashboard/agents/background/')
