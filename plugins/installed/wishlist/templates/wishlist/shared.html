@@ -1,0 +1,31 @@
+{% extends "storefront/base.html" %}
+{% block title %}{{ wishlist.name }} — dot books{% endblock %}
+
+{% block content %}
+<section style="padding: 4rem 0 5rem;">
+  <div class="wrap" style="max-width: 720px;">
+    <p class="eyebrow">Shared wishlist</p>
+    <h1 class="display display-xl" style="margin: 1.5rem 0 1rem;">
+      {{ wishlist.name }}<span class="text-accent">.</span>
+    </h1>
+    <p class="lede" style="margin-bottom: 2rem;">A reading list, shared.</p>
+    <div class="grid-books">
+      {% for item in items %}
+      <a href="/products/{{ item.product.slug }}/" class="book">
+        <div class="cover-wrap">
+          {% if item.product.primary_image %}
+            <img src="{{ item.product.primary_image.image.url }}" alt="{{ item.product.name }}">
+          {% else %}
+            <div class="placeholder">{{ item.product.name|truncatewords:3 }}</div>
+          {% endif %}
+        </div>
+        <div>
+          <p class="title">{{ item.product.name }}</p>
+          <p class="price">{{ item.product.price }}</p>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

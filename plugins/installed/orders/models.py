@@ -281,3 +281,9 @@ class Refund(models.Model):
 
     def __str__(self):
         return f"Refund {self.amount} for Order #{self.order.order_number}"
+
+
+# ReturnRequest model is defined in refunds.py to keep that file self-contained.
+# Re-export here so Django's app loader and makemigrations pick it up.
+from plugins.installed.orders.refunds import ReturnRequest  # noqa: F401, E402
+

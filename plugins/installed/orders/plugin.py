@@ -34,3 +34,9 @@ class OrdersPlugin(MorpheusPlugin):
             send_order_confirmation(order)
         except Exception as e:  # noqa: BLE001 — email never blocks order placement
             logger.warning('orders: confirmation email failed for %s: %s', getattr(order, 'order_number', '?'), e, exc_info=True)
+
+    def contribute_agent_tools(self) -> list:
+        from plugins.installed.orders.agent_tools import (
+            approve_return_tool, list_returns_tool, refund_order_tool,
+        )
+        return [refund_order_tool, list_returns_tool, approve_return_tool]
