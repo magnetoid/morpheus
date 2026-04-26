@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from plugins.base import MorpheusPlugin
-from plugins.contributions import DashboardPage, SettingsPanel
+from plugins.contributions import DashboardPage
 
 logger = logging.getLogger('morpheus.promotions')
 
@@ -66,27 +66,14 @@ class PromotionsPlugin(MorpheusPlugin):
     def contribute_dashboard_pages(self) -> list:
         return [
             DashboardPage(
-                slug='promotions',
+                slug='index',
                 label='Promotions',
-                section='Marketing',
+                section='marketing',
                 icon='ticket',
-                url='/dashboard/promotions/',
-                description='Rule-based discounts, gifts, and free-shipping campaigns.',
+                view='plugins.installed.promotions.views.promotions_index',
+                order=20,
             ),
         ]
 
-    def contribute_settings_panel(self) -> SettingsPanel:
-        return SettingsPanel(
-            label='Promotions',
-            description='Stacking behaviour and default channel scope.',
-            schema=self.get_config_schema(),
-        )
-
-    def get_config_schema(self) -> dict:
-        return {
-            'type': 'object',
-            'properties': {
-                'allow_stacking': {'type': 'boolean', 'default': True},
-                'max_total_discount_percent': {'type': 'number', 'default': 100},
-            },
-        }
+    # No settings panel — promotions are operational data, not config.
+    # All knobs (priority, channel scope, coupon gate) live on each Promotion row.

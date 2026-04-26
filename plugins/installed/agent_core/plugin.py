@@ -111,7 +111,6 @@ class AgentCorePlugin(MorpheusPlugin):
                 icon='clock',
                 section='ai',
                 order=30,
-                description='Schedule autonomous agent runs (digests, monitors, sweeps).',
             ),
             DashboardPage(
                 label='Observability',
@@ -120,7 +119,6 @@ class AgentCorePlugin(MorpheusPlugin):
                 icon='activity',
                 section='ai',
                 order=40,
-                description='Per-agent runs, tokens, latency, top tools, recent failures.',
             ),
         ]
 

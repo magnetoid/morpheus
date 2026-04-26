@@ -25,11 +25,11 @@ class ImportersPlugin(MorpheusPlugin):
     def contribute_dashboard_pages(self) -> list:
         return [
             DashboardPage(
-                slug='import-csv',
+                slug='csv',
                 label='Bulk CSV',
-                section='Catalog',
+                section='catalog',
                 icon='upload',
-                url='/dashboard/import/csv/',
-                description='Import or export products as CSV.',
+                view='plugins.installed.importers.views.csv_index',
+                order=80,
             ),
         ]

@@ -2,17 +2,16 @@
 from __future__ import annotations
 
 from plugins.base import MorpheusPlugin
-from plugins.contributions import SettingsPanel
+from plugins.contributions import DashboardPage
 
 
 class DemoDataPlugin(MorpheusPlugin):
     name = 'demo_data'
     label = 'Demo Data'
-    version = '0.2.0'
+    version = '0.3.0'
     description = (
         'Idempotent seed data for the bookstore demo + on-demand random '
-        'product generator themed by the active storefront theme. Adds '
-        'a settings panel with a one-click generator.'
+        'product generator themed by the active storefront theme.'
     )
     has_models = False
     requires_plugins: list[str] = []
@@ -24,12 +23,14 @@ class DemoDataPlugin(MorpheusPlugin):
             namespace='demo_data',
         )
 
-    def contribute_settings_panel(self) -> SettingsPanel:
-        return SettingsPanel(
-            label='Demo Data',
-            description=(
-                'Generate sample data on demand — products are themed by '
-                'the active storefront theme.'
+    def contribute_dashboard_pages(self) -> list:
+        return [
+            DashboardPage(
+                slug='index',
+                label='Demo data',
+                section='catalog',
+                icon='database',
+                view='plugins.installed.demo_data.views.demo_data_index',
+                order=90,
             ),
-            schema={'type': 'object', 'properties': {}},
-        )
+        ]

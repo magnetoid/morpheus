@@ -7,7 +7,7 @@ from django.shortcuts import redirect, render
 
 
 @staff_member_required
-def settings_view(request):
+def demo_data_index(request):
     """Settings page for the demo_data plugin.
 
     Mounted at `/dashboard/apps/demo_data/settings/` by the unified
