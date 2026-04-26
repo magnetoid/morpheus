@@ -1,0 +1,47 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Draft {{ draft.number }} · Morpheus{% endblock %}
+
+{% block content %}
+<p><a href="/dashboard/draft-orders/" class="meta">← Draft orders</a></p>
+<h1 class="text-xl font-semibold mb-2">Draft #{{ draft.number }}</h1>
+<p class="meta mb-4">
+  Status: <span class="pill">{{ draft.get_status_display }}</span> ·
+  Customer: {{ draft.customer.email|default:draft.customer_email|default:"—" }} ·
+  Channel: {{ draft.channel.slug|default:"—" }}
+</p>
+
+<div class="card mb-6">
+  <table class="morph-table">
+    <thead><tr><th>Product</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Line</th></tr></thead>
+    <tbody>
+    {% for line in draft.lines.all %}
+      <tr>
+        <td>{{ line.product_name }}</td>
+        <td><code>{{ line.sku|default:"—" }}</code></td>
+        <td>{{ line.quantity }}</td>
+        <td>{{ line.unit_price }}</td>
+        <td>{{ line.line_total }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">No lines yet.</td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><td colspan="4" style="text-align:right;">Subtotal</td><td>{{ draft.subtotal }}</td></tr>
+      <tr><td colspan="4" style="text-align:right;">Discount</td><td>−{{ draft.discount_total }}</td></tr>
+      <tr><td colspan="4" style="text-align:right;">Tax</td><td>{{ draft.tax_total }}</td></tr>
+      <tr><td colspan="4" style="text-align:right;">Shipping</td><td>{{ draft.shipping_total }}</td></tr>
+      <tr><td colspan="4" style="text-align:right;"><strong>Total</strong></td><td><strong>{{ draft.total }}</strong></td></tr>
+    </tfoot>
+  </table>
+</div>
+
+{% if draft.status != 'converted' and draft.status != 'cancelled' %}
+<form method="post" action="/dashboard/draft-orders/{{ draft.number }}/convert/">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-primary">Convert to order →</button>
+</form>
+{% else %}
+<p class="meta">Already {{ draft.get_status_display }}{% if draft.converted_order_id %} (order id {{ draft.converted_order_id }}){% endif %}.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Draft orders · Morpheus{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">Draft orders</h1>
+
+<div class="card">
+  <table class="morph-table">
+    <thead>
+      <tr>
+        <th>Number</th><th>Customer</th><th>Channel</th>
+        <th>Status</th><th>Total</th><th>Created</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for d in drafts %}
+      <tr>
+        <td><a href="/dashboard/draft-orders/{{ d.number }}/"><code>{{ d.number }}</code></a></td>
+        <td>{{ d.customer.email|default:d.customer_email|default:"—" }}</td>
+        <td>{% if d.channel %}{{ d.channel.slug }}{% else %}<span class="meta">—</span>{% endif %}</td>
+        <td><span class="pill">{{ d.get_status_display }}</span></td>
+        <td>{{ d.total }}</td>
+        <td>{{ d.created_at|date:"M j H:i" }}</td>
+        <td>
+          {% if d.status != 'converted' and d.status != 'cancelled' %}
+          <form method="post" action="/dashboard/draft-orders/{{ d.number }}/convert/" style="display:inline">
+            {% csrf_token %}
+            <button type="submit" class="btn-link">Convert →</button>
+          </form>
+          {% else %}<span class="meta">{{ d.get_status_display }}</span>{% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-muted);">
+        No draft orders yet — create one via the Morpheus assistant or the Django admin.
+      </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
