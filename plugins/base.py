@@ -295,6 +295,17 @@ class MorpheusPlugin:
         """
         return []
 
+    def contribute_skills(self) -> list:
+        """Return a list of `core.agents.Skill` bundles this plugin exposes.
+
+        A Skill is a named bundle of related tools + an optional system-prompt
+        prelude. Agents opt in via `uses_skills = ('skill_name', ...)`. Use
+        skills to package reusable agent capabilities (e.g. `storefront`,
+        `catalog_admin`, `crm`) instead of duplicating tool lists across
+        every agent that needs them.
+        """
+        return []
+
     # ── Info ──────────────────────────────────────────────────────────────────
 
     def __repr__(self) -> str:

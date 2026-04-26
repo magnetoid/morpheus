@@ -42,6 +42,7 @@ from core.agents.policies import (
 from core.agents.prompts import Prompt, prompt_registry
 from core.agents.registry import agent_registry
 from core.agents.runtime import AgentRuntime, RunResult
+from core.agents.skills import Skill, skill_registry
 from core.agents.tools import Tool, ToolError, ToolResult, tool
 from core.agents.trace import AgentTrace, TraceStep
 
@@ -60,6 +61,7 @@ __all__ = [
     'Prompt',
     'RunResult',
     'ScopeDenied',
+    'Skill',
     'Tool',
     'ToolError',
     'ToolResult',
@@ -68,5 +70,6 @@ __all__ = [
     'enforce_policy',
     'get_llm_provider',
     'prompt_registry',
+    'skill_registry',
     'tool',
 ]

@@ -113,6 +113,15 @@ class AgentCorePlugin(MorpheusPlugin):
                 order=30,
                 description='Schedule autonomous agent runs (digests, monitors, sweeps).',
             ),
+            DashboardPage(
+                label='Observability',
+                slug='observability',
+                view='plugins.installed.agent_core.views.observability_view',
+                icon='activity',
+                section='ai',
+                order=40,
+                description='Per-agent runs, tokens, latency, top tools, recent failures.',
+            ),
         ]
 
     def contribute_settings_panel(self) -> SettingsPanel:

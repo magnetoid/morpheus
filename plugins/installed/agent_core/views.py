@@ -243,6 +243,57 @@ def merchant_ops_chat_view(request):
 
 
 @staff_member_required
+def observability_view(request):
+    """Aggregate per-agent stats over the last N days."""
+    from datetime import timedelta
+    from django.db.models import Avg, Count, Sum
+    from django.utils import timezone
+    from plugins.installed.agent_core.models import AgentRun, AgentStep
+
+    try:
+        days = max(1, min(int(request.GET.get('days') or 7), 90))
+    except (TypeError, ValueError):
+        days = 7
+    since = timezone.now() - timedelta(days=days)
+
+    runs = AgentRun.objects.filter(started_at__gte=since)
+    by_agent = list(
+        runs.values('agent_name').annotate(
+            n=Count('id'),
+            avg_ms=Avg('duration_ms'),
+            tokens=Sum('prompt_tokens') + Sum('completion_tokens'),
+            tools=Sum('tool_call_count'),
+        ).order_by('-n')[:50]
+    )
+    by_state = list(
+        runs.values('state').annotate(n=Count('id')).order_by('-n')
+    )
+    top_tools = list(
+        AgentStep.objects.filter(
+            run__started_at__gte=since, kind='tool_call',
+        ).values('name').annotate(n=Count('id')).order_by('-n')[:25]
+    )
+    failures = list(
+        runs.filter(state='failed').order_by('-started_at')[:25]
+    )
+    totals = runs.aggregate(
+        n=Count('id'),
+        tokens=Sum('prompt_tokens') + Sum('completion_tokens'),
+        tools=Sum('tool_call_count'),
+        avg_ms=Avg('duration_ms'),
+    )
+    return render(request, 'agent_core/dashboard/observability.html', {
+        'days': days,
+        'totals': totals,
+        'by_agent': by_agent,
+        'by_state': by_state,
+        'top_tools': top_tools,
+        'failures': failures,
+        'active_nav': 'agents',
+    })
+
+
+@staff_member_required
 def background_agents_view(request):
     from django.shortcuts import redirect
     from django.utils import timezone

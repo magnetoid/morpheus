@@ -196,8 +196,11 @@ class PluginRegistry:
         # on a sibling tool finds it already registered.
         try:
             from core.agents.registry import agent_registry
+            from core.agents.skills import skill_registry
             for tool in plugin.contribute_agent_tools() or []:
                 agent_registry.register_tool(tool, plugin=plugin.name)
+            for skill in plugin.contribute_skills() or []:
+                skill_registry.register(skill)
             for agent in plugin.contribute_agents() or []:
                 agent_registry.register_agent(agent, plugin=plugin.name)
         except Exception as e:  # noqa: BLE001
