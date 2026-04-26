@@ -1,0 +1,32 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}{% if endpoint %}Edit{% else %}New{% endif %} webhook{% endblock %}
+
+{% block content %}
+<a href="{% url 'webhooks_ui:endpoints_list' %}" class="text-sm text-[color:var(--text-muted)]">← All webhooks</a>
+<h1 class="text-xl font-semibold mt-2 mb-4">{% if endpoint %}Edit webhook{% else %}New webhook{% endif %}</h1>
+
+<form method="post" class="card card-padded" style="max-width: 640px;">
+  {% csrf_token %}
+  <div style="margin-bottom: 1rem;">
+    <label class="block text-sm font-medium mb-1">Name</label>
+    <input type="text" name="name" required value="{{ endpoint.name|default:'' }}" class="input">
+  </div>
+  <div style="margin-bottom: 1rem;">
+    <label class="block text-sm font-medium mb-1">URL</label>
+    <input type="url" name="url" required value="{{ endpoint.url|default:'' }}" class="input">
+  </div>
+  <div style="margin-bottom: 1rem;">
+    <label class="block text-sm font-medium mb-1">Events <span class="text-xs text-[color:var(--text-muted)]">(comma-separated, e.g. order.placed, payment.captured)</span></label>
+    <input type="text" name="events" value="{{ endpoint.events|join:', ' }}" class="input">
+  </div>
+  {% if endpoint %}
+  <div style="margin-bottom: 1rem;">
+    <label class="text-sm"><input type="checkbox" name="is_active" {% if endpoint.is_active %}checked{% endif %}> Active</label>
+  </div>
+  {% endif %}
+  <button type="submit" class="btn btn-primary">Save</button>
+  {% if endpoint %}
+  <button type="submit" formaction="{% url 'webhooks_ui:endpoint_delete' endpoint.id %}" class="btn" style="border-color: var(--danger); color: var(--danger);">Delete</button>
+  {% endif %}
+</form>
+{% endblock %}

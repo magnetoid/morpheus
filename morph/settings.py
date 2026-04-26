@@ -60,6 +60,7 @@ MORPHEUS_DEFAULT_PLUGINS = [
     'plugins.installed.tax',
     'plugins.installed.shipping',
     'plugins.installed.wishlist',
+    'plugins.installed.webhooks_ui',
 ]
 
 # ── Extra plugins installed by merchant via .env ───────────────────────────────

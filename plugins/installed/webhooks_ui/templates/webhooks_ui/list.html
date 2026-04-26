@@ -1,0 +1,29 @@
+{% extends "admin_dashboard/base.html" %}
+{% block title %}Webhooks · Morpheus admin{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-semibold">Webhooks</h1>
+  <a href="{% url 'webhooks_ui:endpoint_create' %}" class="btn btn-primary">+ New endpoint</a>
+</div>
+<div class="card">
+  <table class="morph-table">
+    <thead>
+      <tr><th>Name</th><th>URL</th><th>Events</th><th>Status</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for ep in endpoints %}
+      <tr>
+        <td>{{ ep.name }}</td>
+        <td><code style="font-size:.8rem;">{{ ep.url|truncatechars:60 }}</code></td>
+        <td><code style="font-size:.8rem;">{{ ep.events|join:", " }}</code></td>
+        <td>{% if ep.is_active %}<span class="pill pill-success">active</span>{% else %}<span class="pill pill-neutral">inactive</span>{% endif %}</td>
+        <td><a href="{% url 'webhooks_ui:endpoint_edit' ep.id %}" class="btn-link">Edit</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" style="text-align:center; padding: 2rem; color: var(--text-muted);">No webhooks configured.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -92,3 +92,73 @@ def adjust_stock_tool(
                 'new_quantity': new_qty, 'reason': reason},
         display=f'{variant_sku} @ {warehouse_code}: now {new_qty}',
     )
+
+
+@tool(
+    name='inventory.list_back_in_stock_subs',
+    description='List unsent back-in-stock notification subscriptions.',
+    scopes=['inventory.read'],
+    schema={'type': 'object', 'properties': {'limit': {'type': 'integer', 'default': 50}}},
+)
+def list_back_in_stock_tool(*, limit: int = 50) -> ToolResult:
+    from plugins.installed.inventory.models import BackInStockSubscription
+    rows = list(
+        BackInStockSubscription.objects
+        .filter(notified_at__isnull=True)
+        .select_related('product')[: max(1, min(int(limit or 50), 200))]
+    )
+    return ToolResult(output={
+        'subscriptions': [
+            {'product': s.product.name, 'slug': s.product.slug, 'email': s.email,
+             'created_at': s.created_at.isoformat()}
+            for s in rows
+        ],
+    })
+
+
+@tool(
+    name='catalog.schedule_price_change',
+    description='Schedule a price change for a product. Becomes active at `effective_at`.',
+    scopes=['catalog.write'],
+    schema={
+        'type': 'object',
+        'properties': {
+            'slug': {'type': 'string'},
+            'new_price': {'type': 'number'},
+            'currency': {'type': 'string', 'default': 'USD'},
+            'effective_at_iso': {'type': 'string', 'description': 'ISO-8601 datetime UTC'},
+            'note': {'type': 'string'},
+        },
+        'required': ['slug', 'new_price', 'effective_at_iso'],
+    },
+    requires_approval=True,
+)
+def schedule_price_change_tool(
+    *, slug: str, new_price: float, effective_at_iso: str,
+    currency: str = 'USD', note: str = '',
+) -> ToolResult:
+    from datetime import datetime
+    from decimal import Decimal
+    from djmoney.money import Money
+
+    from plugins.installed.catalog.models import PriceSchedule, Product
+
+    try:
+        product = Product.objects.get(slug=slug)
+    except Product.DoesNotExist as e:
+        raise ToolError(f'Unknown product: {slug}') from e
+    try:
+        when = datetime.fromisoformat(effective_at_iso.replace('Z', '+00:00'))
+    except ValueError as e:
+        raise ToolError(f'Bad effective_at_iso: {e}') from e
+    sched = PriceSchedule.objects.create(
+        product=product,
+        new_price=Money(Decimal(str(new_price)), currency),
+        effective_at=when,
+        note=note[:240],
+    )
+    return ToolResult(
+        output={'schedule_id': str(sched.id), 'product': product.name,
+                'new_price': str(new_price), 'effective_at': when.isoformat()},
+        display=f'Price change for {product.name} → {new_price} at {when}',
+    )
