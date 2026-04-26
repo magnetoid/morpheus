@@ -57,6 +57,14 @@
   .nav-link:hover { background: rgba(0,0,0,.06); }
   .nav-link.active { background: rgba(0,0,0,.08); }
   .nav-section { padding:.5rem .65rem .25rem; font-size:.7rem; font-weight:600; color: var(--text-muted); text-transform: uppercase; letter-spacing:.06em; }
+  .nav-section-btn { width:100%; display:flex; align-items:center; justify-content:space-between; padding:.5rem .65rem .25rem; font-size:.7rem; font-weight:600; color: var(--text-muted); text-transform: uppercase; letter-spacing:.06em; background: transparent; border: none; cursor: pointer; }
+  .nav-section-btn:hover { color: var(--text); }
+  .nav-section-btn i { transition: transform .15s ease; }
+  .nav-section-btn.collapsed i { transform: rotate(-90deg); }
+  .nav-group { overflow: hidden; transition: max-height .2s ease, opacity .15s ease; max-height: 800px; opacity: 1; }
+  .nav-group.collapsed { max-height: 0; opacity: 0; }
+  .sidebar-nav { transition: transform .25s ease, opacity .15s ease; }
+  .sidebar-nav.slide-out-left { transform: translateX(-12px); opacity: 0; pointer-events: none; }
   .input { width:100%; height:2.25rem; padding:0 .75rem; font-size:.875rem; border-radius: var(--radius-sm); border:1px solid var(--border); background: var(--surface); color: var(--text); }
   .input:focus { outline: none; border-color: var(--text); box-shadow: 0 0 0 2px rgba(0,0,0,.08); }
   .input-search { padding-left: 2rem; }
@@ -78,32 +86,79 @@
     </a>
     <button id="sidebar-close" class="md:hidden btn btn-ghost p-1.5"><i data-lucide="x" class="h-4 w-4"></i></button>
   </div>
-  <nav class="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+  {# ── MAIN NAV (slides out when entering Settings) ─────────────────────── #}
+  <nav id="nav-main" class="sidebar-nav flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
     <a href="{% url 'admin_dashboard:home' %}"      class="nav-link {% if active_nav == 'home' %}active{% endif %}"><i data-lucide="home" class="h-4 w-4"></i> Home</a>
     <a href="{% url 'admin_dashboard:orders' %}"    class="nav-link {% if active_nav == 'orders' %}active{% endif %}"><i data-lucide="shopping-bag" class="h-4 w-4"></i> Orders</a>
     <a href="{% url 'admin_dashboard:products' %}"  class="nav-link {% if active_nav == 'products' %}active{% endif %}"><i data-lucide="package" class="h-4 w-4"></i> Products</a>
     <a href="{% url 'admin_dashboard:customers' %}" class="nav-link {% if active_nav == 'customers' %}active{% endif %}"><i data-lucide="users" class="h-4 w-4"></i> Customers</a>
     <a href="{% url 'admin_dashboard:marketing' %}" class="nav-link {% if active_nav == 'marketing' %}active{% endif %}"><i data-lucide="megaphone" class="h-4 w-4"></i> Marketing</a>
     <a href="{% url 'admin_dashboard:analytics' %}" class="nav-link {% if active_nav == 'analytics' %}active{% endif %}"><i data-lucide="bar-chart-2" class="h-4 w-4"></i> Analytics</a>
-    <div class="nav-section">AI &amp; agents</div>
-    <a href="/admin/assistant/" class="nav-link {% if active_nav == 'assistant' %}active{% endif %}"><i data-lucide="sparkles" class="h-4 w-4"></i> Assistant</a>
-    <a href="{% url 'admin_dashboard:ai_insights' %}" class="nav-link {% if active_nav == 'ai_insights' %}active{% endif %}"><i data-lucide="bar-chart" class="h-4 w-4"></i> Insights</a>
-    <div class="nav-section">Sales channels</div>
-    <a href="#" class="nav-link"><i data-lucide="globe" class="h-4 w-4"></i> Online store</a>
-    {# Plugin-contributed pages, grouped by section. Each section header
-       only appears when at least one plugin contributes to it. #}
+
+    <button type="button" class="nav-section-btn" data-section="ai">
+      <span>AI &amp; agents</span><i data-lucide="chevron-down" class="h-3 w-3"></i>
+    </button>
+    <div class="nav-group" data-group="ai">
+      <a href="/admin/assistant/" class="nav-link {% if active_nav == 'assistant' %}active{% endif %}"><i data-lucide="sparkles" class="h-4 w-4"></i> Assistant</a>
+      <a href="{% url 'admin_dashboard:ai_insights' %}" class="nav-link {% if active_nav == 'ai_insights' %}active{% endif %}"><i data-lucide="bar-chart" class="h-4 w-4"></i> Insights</a>
+    </div>
+
+    <button type="button" class="nav-section-btn" data-section="sales">
+      <span>Sales channels</span><i data-lucide="chevron-down" class="h-3 w-3"></i>
+    </button>
+    <div class="nav-group" data-group="sales">
+      <a href="#" class="nav-link"><i data-lucide="globe" class="h-4 w-4"></i> Online store</a>
+    </div>
+
+    {# Plugin-contributed pages, grouped by section. Each group is collapsible. #}
     {% for section in sidebar_sections %}
-    <div class="nav-section">{{ section.label }}</div>
-    {% for page in section.pages %}
-    <a href="/dashboard/apps/{{ page.plugin }}/{{ page.slug }}/" class="nav-link">
-      <i data-lucide="{{ page.icon|default:'circle' }}" class="h-4 w-4"></i> {{ page.label }}
-    </a>
+    <button type="button" class="nav-section-btn" data-section="plug-{{ section.key }}">
+      <span>{{ section.label }}</span><i data-lucide="chevron-down" class="h-3 w-3"></i>
+    </button>
+    <div class="nav-group" data-group="plug-{{ section.key }}">
+      {% for page in section.pages %}
+      <a href="/dashboard/apps/{{ page.plugin }}/{{ page.slug }}/" class="nav-link">
+        <i data-lucide="{{ page.icon|default:'circle' }}" class="h-4 w-4"></i> {{ page.label }}
+      </a>
+      {% endfor %}
+    </div>
     {% endfor %}
-    {% endfor %}
-    <div class="nav-section">Apps &amp; settings</div>
-    <a href="{% url 'admin_dashboard:apps' %}"     class="nav-link {% if active_nav == 'apps' %}active{% endif %}"><i data-lucide="grid-3x3" class="h-4 w-4"></i> Apps</a>
-    <a href="{% url 'admin_dashboard:settings' %}" class="nav-link {% if active_nav == 'settings' %}active{% endif %}"><i data-lucide="settings" class="h-4 w-4"></i> Settings</a>
+
+    <button type="button" class="nav-section-btn" data-section="apps">
+      <span>Apps &amp; settings</span><i data-lucide="chevron-down" class="h-3 w-3"></i>
+    </button>
+    <div class="nav-group" data-group="apps">
+      <a href="{% url 'admin_dashboard:apps' %}" class="nav-link {% if active_nav == 'apps' %}active{% endif %}"><i data-lucide="grid-3x3" class="h-4 w-4"></i> Apps</a>
+      <a href="{% url 'admin_dashboard:settings' %}" id="settings-link" class="nav-link {% if active_nav == 'settings' %}active{% endif %}"><i data-lucide="settings" class="h-4 w-4"></i> Settings</a>
+    </div>
   </nav>
+
+  {# ── SETTINGS NAV (slides in when /dashboard/settings/ is open) ──────── #}
+  <nav id="nav-settings" class="sidebar-nav flex-1 overflow-y-auto px-2 py-3 space-y-0.5" style="display:none;">
+    <div class="nav-section">Platform</div>
+    <a href="{% url 'admin_dashboard:settings' %}#pane=core-store" class="nav-link"><i data-lucide="store" class="h-4 w-4"></i> Store</a>
+    <a href="{% url 'admin_dashboard:settings' %}#pane=core-ai" class="nav-link"><i data-lucide="sparkles" class="h-4 w-4"></i> AI defaults</a>
+    <a href="{% url 'admin_dashboard:settings' %}#pane=core-theme" class="nav-link"><i data-lucide="palette" class="h-4 w-4"></i> Theme</a>
+    <a href="{% url 'admin_dashboard:apps' %}" class="nav-link"><i data-lucide="grid-3x3" class="h-4 w-4"></i> Apps</a>
+
+    {# Every plugin's settings panel becomes its own entry here. #}
+    <div class="nav-section">Plugins</div>
+    {% for plugin in plugin_registry.active_plugins %}
+      {% with panel=plugin_registry|default:None %}{% endwith %}
+    {% endfor %}
+    {% for name, panel in plugin_registry._settings_panels.items %}
+    <a href="/dashboard/apps/{{ name }}/settings/" class="nav-link"><i data-lucide="settings" class="h-4 w-4"></i> {{ panel.label }}</a>
+    {% endfor %}
+
+    <div style="margin-top:auto;"></div>
+  </nav>
+
+  {# Bottom-pinned 'go back' button — visible only in settings mode. #}
+  <div id="settings-back-row" class="border-t border-[color:var(--border)] p-2" style="display:none;">
+    <a href="{% url 'admin_dashboard:home' %}" class="nav-link" style="font-weight:500;">
+      <i data-lucide="arrow-left" class="h-4 w-4"></i> Back to dashboard
+    </a>
+  </div>
 </aside>
 
 <div class="flex-1 flex flex-col min-w-0">
@@ -157,6 +212,45 @@
     const upanel = document.getElementById('user-menu-panel');
     utoggle?.addEventListener('click', e => { e.stopPropagation(); upanel.style.display = upanel.style.display === 'block' ? 'none' : 'block'; });
     document.addEventListener('click', e => { if (upanel && !document.getElementById('user-menu')?.contains(e.target)) upanel.style.display = 'none'; });
+
+    // Collapsible sidebar sections — Shopify-style. State persisted per-section in localStorage.
+    document.querySelectorAll('.nav-section-btn').forEach(btn => {
+      const key = 'nav.collapsed.' + btn.dataset.section;
+      const group = document.querySelector(`.nav-group[data-group="${btn.dataset.section}"]`);
+      if (localStorage.getItem(key) === '1') { btn.classList.add('collapsed'); group?.classList.add('collapsed'); }
+      btn.addEventListener('click', () => {
+        const willCollapse = !btn.classList.contains('collapsed');
+        btn.classList.toggle('collapsed', willCollapse);
+        group?.classList.toggle('collapsed', willCollapse);
+        localStorage.setItem(key, willCollapse ? '1' : '0');
+      });
+    });
+
+    // Settings-mode sidebar swap. Detect from URL; animate the swap.
+    const navMain = document.getElementById('nav-main');
+    const navSettings = document.getElementById('nav-settings');
+    const settingsBackRow = document.getElementById('settings-back-row');
+    const inSettings = location.pathname.startsWith('/dashboard/settings/') || location.pathname.startsWith('/dashboard/apps/');
+    function showSettingsNav() {
+      if (!navMain || !navSettings) return;
+      navMain.style.display = 'none';
+      navSettings.style.display = 'block';
+      if (settingsBackRow) settingsBackRow.style.display = 'block';
+    }
+    function showMainNav() {
+      if (!navMain || !navSettings) return;
+      navSettings.style.display = 'none';
+      navMain.style.display = 'block';
+      if (settingsBackRow) settingsBackRow.style.display = 'none';
+    }
+    if (inSettings) showSettingsNav(); else showMainNav();
+
+    // Animate the swap when clicking the Settings link without a full page nav.
+    document.getElementById('settings-link')?.addEventListener('click', e => {
+      navMain?.classList.add('slide-out-left');
+      // Let CSS transition play, then navigate.
+      setTimeout(() => { /* default link nav happens */ }, 180);
+    });
   })();
 </script>
 {# The hard-coded Morpheus Assistant — always present in admin. #}
