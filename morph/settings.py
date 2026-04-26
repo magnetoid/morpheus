@@ -111,6 +111,7 @@ MORPHEUS_ENGINE_APPS = [
     'core',
     'core.assistant',  # Hard-coded Morpheus Assistant
     'core.i18n',       # Translation kernel — generic-FK Translation rows
+    'core.audit',      # Security-grade audit log
     'plugins',
     'themes',
     'api',

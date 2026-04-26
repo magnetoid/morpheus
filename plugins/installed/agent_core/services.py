@@ -226,18 +226,18 @@ def run_agent(
     return result
 
 
+from core.utils.safe_db import safe_db
+
+
+@safe_db(default=[])
 def history_for_conversation(conversation_id: str, *, limit: int = 20) -> list[LLMMessage]:
     """Load the recent messages of a conversation as `LLMMessage` history."""
     from plugins.installed.agent_core.models import AgentMessage
 
-    try:
-        rows = list(
-            AgentMessage.objects
-            .filter(conversation_id=conversation_id)
-            .order_by('-created_at')[:limit]
-        )
-    except DatabaseError as e:
-        logger.warning('agent_core: load history failed: %s', e)
-        return []
+    rows = list(
+        AgentMessage.objects
+        .filter(conversation_id=conversation_id)
+        .order_by('-created_at')[:limit]
+    )
     rows.reverse()
     return [LLMMessage(role=r.role, content=r.content) for r in rows]
